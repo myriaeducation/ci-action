@@ -134,9 +134,9 @@ runs:
            [[ "${{ inputs.phpunit }}" == "false" || "${{ steps.phpunit.outcome }}" == "success" ]] &&
            [[ "${{ inputs.jest }}" == "false" || "${{ steps.jest.outcome }}" == "success" ]]
         then
-          echo "::set-output name=test_success::true"
+          echo "::set-output name=test_success::success"
         else
-          echo "::set-output name=test_success::false"
+          echo "::set-output name=test_success::failure"
         fi
       shell: bash
     
@@ -152,7 +152,7 @@ runs:
             "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ steps.set_test_success_output.outputs.test_success }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
             "attachments": [
               {
-                "pretext": "Deployment Status: ${{ steps.set_test_success_output.outputs.test_success }}",
+                "pretext": "Build Status: ${{ steps.set_test_success_output.outputs.test_success }}",
                 "color": "${{ steps.set_test_success_output.outputs.test_success == 'success' && '28a745' || 'ff0000' }}",
                 "fields": [
                   {
