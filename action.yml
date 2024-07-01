@@ -1,0 +1,152 @@
+name: 'Deploy Action'
+description: 'A reusable GitHub Action for executing tests.'
+inputs:
+  slack_bot_token:
+    description: 'Slack bot token'
+    required: true
+  slack_channel_id:
+    description: 'Slack notification channel ID'
+    required: true
+  ssh_private_key:
+    description: 'SSH private key'
+    required: true
+  git_organization:
+    description: 'Git organization'
+    required: true
+  git_token:
+    description: 'Git token'
+    required: true
+  admin_domain:
+    description: 'Organization admin domain'
+    required: true
+  corporate_domain:
+    description: 'Organization corporate domain'
+    required: true
+  phpunit:
+    description: 'Execute phpunit tests'
+    required: true
+  behat:
+    description: 'Execute behat tests'
+    required: true
+  jest:
+    description: 'Execute jest tests'
+    required: true
+  nb_workers:
+    description: 'Number of workers'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - id: slack
+      uses: slackapi/slack-github-action@v1.25.0
+      env:
+        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
+      with:
+        channel-id: ${{ inputs.slack_channel_id }}
+        payload: |
+          {
+            "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "attachments": [
+              {
+                "pretext": "Build started",
+                "color": "dbab09",
+                "fields": [
+                  {
+                    "title": "Status",
+                    "short": true,
+                    "value": "In Progress"
+                  }
+                ]
+              }
+            ]
+          }
+          
+    - name: Login to Docker
+      run: echo "${{ inputs.git_token }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+      shell: bash
+      
+    # —— Setup Github actions 🐙 ————————————————————————————————————————————————
+    # https://github.com/actions/checkout (official)
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Mount project
+      shell: bash
+      run: |
+        DEPENDENCIES_BRANCH=$(echo ${GITHUB_REF#refs/heads/}) \
+        SSH_PRIVATE_KEY="${{ inputs.ssh_private_key }}" \
+        CR_PAT="${{ inputs.git_token }}" \
+        ADMIN_DOMAIN="${{ inputs.admin_domain }}" \
+        CORPORATE_DOMAIN="${{ inputs.corporate_domain }}" \
+        GIT_ORGANIZATION="${{ inputs.git_organization }}" \
+        docker compose -f docker-compose-ci.yml up -d
+        
+    - name: Build test environment
+      shell: bash
+      run: |
+        docker exec -u www-data web bash ci.sh
+    
+    - name: PHPUnit
+      uses: nick-fields/retry@v3
+      if: inputs.phpunit == 'true'
+      with:
+        timeout_minutes: 15
+        max_attempts: 2
+        command: docker exec -u www-data web bash -c "SYMFONY_DEPRECATIONS_HELPER=weak ./vendor/bin/paratest -p ${{ inputs.nb_workers }} --runner=WrapperRunner --stop-on-failure"
+    
+    - name: Jest
+      uses: nick-fields/retry@v3
+      if: inputs.jest == 'true'
+      with:
+        timeout_minutes: 15
+        max_attempts: 2
+        command: docker exec -u www-data web bash -c "npm run test --runInBand --silent"
+        
+    - name: Behat
+      uses: nick-fields/retry@v3
+      if: inputs.behat == 'true'
+      with:
+        timeout_minutes: 15
+        max_attempts: 2
+        command: docker exec -u www-data web bash -c "./vendor/bin/behat -l ${{ inputs.nb_workers }} --suite=default --stop-on-failure"
+    
+    - name: Dispatch deploy master
+      if: success() && github.ref == 'refs/heads/master'
+      uses: peter-evans/repository-dispatch@v2
+      with:
+        token: ${{ inputs.git_token }}
+        repository: ${{ github.repository }}
+        event-type: deploy-master
+        
+    - id: 'test_success'
+      if: success()
+      shell: bash
+      run: echo "Tests passed successfully"
+    
+    - uses: slackapi/slack-github-action@v1.25.0
+      if: always()
+      with:
+        # You can pass in multiple channels to post to by providing a comma-delimited list of channel IDs.
+        channel-id: ${{ vars.SLACK_NOTIFICATION_CHANNEL_ID }}
+        # For posting a simple plain text message
+        update-ts: ${{ steps.slack.outputs.ts }}
+        payload: |
+          {
+            "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ job.status }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "attachments": [
+              {
+                "pretext": "Deployment Status: ${{ steps.test_success.outcome }}",
+                "color": "${{ steps.test_success.outcome == 'success' && '28a745' || 'ff0000' }}",
+                "fields": [
+                  {
+                    "title": "Status",
+                    "short": true,
+                    "value": "${{ steps.test_success.outcome == 'success' && 'Completed' || 'Failure' }}"
+                  }
+                ]
+              }
+            ]
+          }
+      env:
+        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}

@@ -1,0 +1,28 @@
+name: Sync to Repo
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: vars.SYNC_TO_ORGANIZATION != 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0  # fetches all the history
+      
+      - name: Pushes to another repository
+        run: |
+          git config --local user.email "${{ secrets.GIT_EMAIL }}"
+          git config --local user.name "${{ secrets.GIT_USERNAME }}"
+          REPO_NAME=$(echo ${{ github.repository }} | cut -d '/' -f 2)
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          git remote add repo "https://x-access-token:${{ secrets.CR_PAT }}@github.com/${{ vars.SYNC_TO_ORGANIZATION }}/$REPO_NAME.git"
+          git checkout $BRANCH_NAME
+          git pull origin $BRANCH_NAME
+          git config --unset-all http.https://github.com/.extraheader
+          git push --force repo $BRANCH_NAME

@@ -1,0 +1,103 @@
+name: Publish Release
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - id: slack
+        uses: slackapi/slack-github-action@v1.25.0
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_TOKEN }}
+        with:
+          channel-id: ${{ vars.SLACK_NOTIFICATION_CHANNEL_ID }}
+          payload: |
+            {
+              "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Publishing started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+              "attachments": [
+                {
+                  "pretext": "Publishing started",
+                  "color": "dbab09",
+                  "fields": [
+                    {
+                      "title": "Status",
+                      "short": true,
+                      "value": "In Progress"
+                    }
+                  ]
+                }
+              ]
+            }
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '14'
+      
+      - name: Get version from package.json
+        id: get_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          MAJOR_VERSION=$(echo $VERSION | cut -d. -f1)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "MAJOR_VERSION=$MAJOR_VERSION" >> $GITHUB_ENV
+          echo "::set-output name=version::$VERSION"
+          echo "::set-output name=major_version::$MAJOR_VERSION"
+      
+      - name: Set up Git
+        run: |
+          git config --global user.email "${{ secrets.GIT_EMAIL }}"
+          git config --global user.name "${{ secrets.GIT_USERNAME }}"
+      
+      - name: Create Git tags
+        id: create_tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.CR_PAT }}
+        run: |
+          git tag -f v${{ env.VERSION }}
+          git tag -f v${{ env.MAJOR_VERSION }}
+          git push origin -f v${{ env.VERSION }}
+          git push origin -f v${{ env.MAJOR_VERSION }}
+          
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.CR_PAT }}
+        with:
+          tag_name: "v${{ env.VERSION }}"
+          release_name: "Release v${{ env.VERSION }}"
+          draft: false
+          prerelease: false
+          
+      - uses: slackapi/slack-github-action@v1.25.0
+        if: always()
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_TOKEN }}
+        with:
+          channel-id: ${{ vars.SLACK_NOTIFICATION_CHANNEL_ID }}
+          update-ts: ${{ steps.slack.outputs.ts }}
+          payload: |
+            {
+              "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Publishing Status in branch `${{ github.ref_name }}`: ${{ job.status }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+              "attachments": [
+                {
+                  "pretext": "Publishing Status: ${{ job.status }}",
+                  "color": "${{ job.status == 'success' && '28a745' || 'ff0000' }}",
+                  "fields": [
+                    {
+                      "title": "Status",
+                      "short": true,
+                      "value": "${{ job.status == 'success' && 'Completed' || 'Failure' }}"
+                    }
+                  ]
+                }
+              ]
+            }
