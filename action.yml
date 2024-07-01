@@ -125,8 +125,13 @@ runs:
         event-type: deploy-master
     
     - id: 'test_success'
-      if: always()
-      run: echo "::set-output name=outcome::${{ success() && 'success' || 'failure' }}"
+      run: |
+        if ${{ success() }}
+        then
+          echo "::set-output name=outcome::success"
+        else
+          echo "::set-output name=outcome::failure"
+        fi
       shell: bash
     
     - uses: slackapi/slack-github-action@v1.25.0
