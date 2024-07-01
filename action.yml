@@ -93,6 +93,7 @@ runs:
         docker exec -u www-data web bash ci.sh
     
     - name: PHPUnit
+      id: phpunit
       uses: nick-fields/retry@v3
       if: inputs.phpunit == 'true'
       with:
@@ -101,6 +102,7 @@ runs:
         command: docker exec -u www-data web bash -c "SYMFONY_DEPRECATIONS_HELPER=weak ./vendor/bin/paratest -p ${{ steps.cpu_cores.outputs.cores }} --runner=WrapperRunner --stop-on-failure"
     
     - name: Jest
+      id: jest
       uses: nick-fields/retry@v3
       if: inputs.jest == 'true'
       with:
@@ -109,6 +111,7 @@ runs:
         command: docker exec -u www-data web bash -c "npm run test --runInBand --silent"
         
     - name: Behat
+      id: behat
       uses: nick-fields/retry@v3
       if: inputs.behat == 'true'
       with:
@@ -124,13 +127,16 @@ runs:
         repository: ${{ github.repository }}
         event-type: deploy-master
     
-    - id: 'test_success'
+    - name: Set test_success output
+      id: set_test_success_output
       run: |
-        if ${{ success() }}
+        if [[ "${{ inputs.behat }}" == "false" || "${{ steps.behat.outcome }}" == "success" ]] &&
+           [[ "${{ inputs.phpunit }}" == "false" || "${{ steps.phpunit.outcome }}" == "success" ]] &&
+           [[ "${{ inputs.jest }}" == "false" || "${{ steps.jest.outcome }}" == "success" ]]
         then
-          echo "::set-output name=outcome::success"
+          echo "::set-output name=test_success::true"
         else
-          echo "::set-output name=outcome::failure"
+          echo "::set-output name=test_success::false"
         fi
       shell: bash
     
@@ -143,16 +149,16 @@ runs:
         update-ts: ${{ steps.slack.outputs.ts }}
         payload: |
           {
-            "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ steps.test_success.outcome }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ steps.set_test_success_output.outputs.test_success }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
             "attachments": [
               {
-                "pretext": "Deployment Status: ${{ steps.test_success.outcome }}",
-                "color": "${{ steps.test_success.outcome == 'success' && '28a745' || 'ff0000' }}",
+                "pretext": "Deployment Status: ${{ steps.set_test_success_output.outputs.test_success }}",
+                "color": "${{ steps.set_test_success_output.outputs.test_success == 'success' && '28a745' || 'ff0000' }}",
                 "fields": [
                   {
                     "title": "Status",
                     "short": true,
-                    "value": "${{ steps.test_success.outcome == 'success' && 'Completed' || 'Failure' }}"
+                    "value": "${{ steps.set_test_success_output.outputs.test_success == 'success' && 'Completed' || 'Failure' }}"
                   }
                 ]
               }
