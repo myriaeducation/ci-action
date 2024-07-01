@@ -135,7 +135,7 @@ runs:
         update-ts: ${{ steps.slack.outputs.ts }}
         payload: |
           {
-            "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ job.status }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ steps.test_success.outcome }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
             "attachments": [
               {
                 "pretext": "Deployment Status: ${{ steps.test_success.outcome }}",
