@@ -120,11 +120,11 @@ runs:
         token: ${{ inputs.git_token }}
         repository: ${{ github.repository }}
         event-type: deploy-master
-        
+    
     - id: 'test_success'
-      if: success()
+      if: always()
+      run: echo "::set-output name=outcome::${{ success() && 'success' || 'failure' }}"
       shell: bash
-      run: echo "Tests passed successfully"
     
     - uses: slackapi/slack-github-action@v1.25.0
       if: always()
