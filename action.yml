@@ -130,7 +130,7 @@ runs:
       if: always()
       with:
         # You can pass in multiple channels to post to by providing a comma-delimited list of channel IDs.
-        channel-id: ${{ vars.SLACK_NOTIFICATION_CHANNEL_ID }}
+        channel-id: ${{ inputs.slack_channel_id }}
         # For posting a simple plain text message
         update-ts: ${{ steps.slack.outputs.ts }}
         payload: |
