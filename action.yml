@@ -31,9 +31,6 @@ inputs:
   jest:
     description: 'Execute jest tests'
     required: true
-  nb_workers:
-    description: 'Number of workers'
-    required: true
 
 runs:
   using: 'composite'
