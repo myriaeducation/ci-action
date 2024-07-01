@@ -24,13 +24,16 @@ inputs:
     required: true
   phpunit:
     description: 'Execute phpunit tests'
-    required: true
+    required: false
+    default: 'false'
   behat:
     description: 'Execute behat tests'
-    required: true
+    required: false
+    default: 'false'
   jest:
     description: 'Execute jest tests'
-    required: true
+    required: false
+    default: 'false'
 
 runs:
   using: 'composite'
