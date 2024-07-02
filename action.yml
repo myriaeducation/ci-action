@@ -90,14 +90,14 @@ runs:
     - name: Mount project
       shell: bash
       run: |
+        eval "$(jq -r 'to_entries | .[] | "export \(.key)=\(.value)"' <<< '${{ inputs.custom_env }}')"
         DEPENDENCIES_BRANCH=$(echo ${GITHUB_REF#refs/heads/}) \
         SSH_PRIVATE_KEY="${{ inputs.ssh_private_key }}" \
         CR_PAT="${{ inputs.git_token }}" \
         ADMIN_DOMAIN="${{ inputs.admin_domain }}" \
         CORPORATE_DOMAIN="${{ inputs.corporate_domain }}" \
         GIT_ORGANIZATION="${{ inputs.git_organization }}" \
-        CUSTOM_ENV_VARS="${{ inputs.custom_env }}" \
-        eval $(echo $CUSTOM_ENV_VARS | sed 's/,/ /g') \
+
         docker compose -f docker-compose-ci.yml up -d
         
     - name: Build test environment
