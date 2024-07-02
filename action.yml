@@ -34,6 +34,9 @@ inputs:
     description: 'Execute jest tests'
     required: false
     default: 'false'
+  nb_workers:
+    description: 'Number of workers'
+    required: false
 
 runs:
   using: 'composite'
@@ -64,7 +67,12 @@ runs:
           
     - name: Get CPU cores count
       id: cpu_cores
-      run: echo "::set-output name=cores::$(nproc)"
+      run: |
+        if [ -n "${{ inputs.nb_workers }}" ]; then
+          echo "::set-output name=cores::${{ inputs.nb_workers }}"
+        else
+          echo "::set-output name=cores::$(nproc)"
+        fi
       shell: bash
           
     - name: Login to Docker
@@ -90,7 +98,7 @@ runs:
     - name: Build test environment
       shell: bash
       run: |
-        docker exec -u www-data web bash ci.sh
+        docker exec -e NB_WORKERS=${{ steps.cpu_cores.outputs.cores }} -u www-data web bash ci.sh
     
     - name: PHPUnit
       id: phpunit
