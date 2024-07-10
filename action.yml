@@ -98,6 +98,7 @@ runs:
         ADMIN_DOMAIN="${{ inputs.admin_domain }}" \
         CORPORATE_DOMAIN="${{ inputs.corporate_domain }}" \
         GIT_ORGANIZATION="${{ inputs.git_organization }}" \
+        SLACK_TOKEN="${{ inputs.slack_bot_token }}" \
         IS_CI="true" \
         docker compose -f docker-compose-ci.yml up -d
         
