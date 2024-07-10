@@ -100,6 +100,7 @@ runs:
         GIT_ORGANIZATION="${{ inputs.git_organization }}" \
         SLACK_TOKEN="${{ inputs.slack_bot_token }}" \
         IS_CI="true" \
+        SLACK_NOTIFICATION_TS="${{ steps.slack.outputs.ts }}" \
         docker compose -f docker-compose-ci.yml up -d
         
     - name: Build test environment
