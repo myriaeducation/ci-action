@@ -40,6 +40,10 @@ inputs:
   custom_env:
     description: 'Custom environment variables as key=value pairs'
     required: false
+  jest_command:
+    description: 'Custom Jest command'
+    required: false
+    default: 'npm run test --runInBand --silent'
 
 runs:
   using: 'composite'
@@ -124,7 +128,7 @@ runs:
       with:
         timeout_minutes: 15
         max_attempts: 2
-        command: docker exec -u www-data web bash -c "npm run test --runInBand --silent"
+        command: docker exec -u www-data web bash -c "${{ inputs.jest_command }}"
         
     - name: Behat
       id: behat
