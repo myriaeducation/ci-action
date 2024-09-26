@@ -195,7 +195,7 @@ runs:
         
         # Utilisation de rsync sans redéfinir la clé privée
         rsync -avz --delete ./public-dist www-data@${{ inputs.ip }}:/var/www/$REPO_NAME/tmp/public-dist
-        rsync -avz --delete ./public-dist www-data@${{ inputs.ip }}:/var/www/$REPO_NAME/tmp/vendor
+        rsync -avz --delete ./vendor www-data@${{ inputs.ip }}:/var/www/$REPO_NAME/tmp/vendor
       shell: bash
     
     - name: Set test_success output
