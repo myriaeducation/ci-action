@@ -175,7 +175,6 @@ runs:
       run: |
         PROJECT_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
         ssh www-data@${{ inputs.ip }} "rm -rf /var/www/$PROJECT_NAME/tmp/public-dist"
-        ssh www-data@${{ inputs.ip }} "rm -rf /var/www/$PROJECT_NAME/tmp/vendor"
       shell: bash
     
     - name: Copy public/dist from container to host
@@ -185,7 +184,6 @@ runs:
     
         # Copier le contenu depuis le conteneur Docker
         docker cp web:/var/www/$PROJECT_NAME/public/dist ./public-dist
-        docker cp web:/var/www/$PROJECT_NAME/vendor ./vendor
       shell: bash
     
     - name: Transfer artifact to the server using rsync
@@ -195,7 +193,6 @@ runs:
         
         # Utilisation de rsync sans redéfinir la clé privée
         rsync -avz --delete ./public-dist www-data@${{ inputs.ip }}:/var/www/$REPO_NAME/tmp/public-dist
-        rsync -avz --delete ./vendor www-data@${{ inputs.ip }}:/var/www/$REPO_NAME/tmp/vendor
       shell: bash
     
     - name: Set test_success output
