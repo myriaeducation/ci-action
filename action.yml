@@ -184,6 +184,7 @@ runs:
     
         # Copier le contenu depuis le conteneur Docker
         docker cp web:/var/www/$PROJECT_NAME/public/dist ./public-dist
+        docker cp web:/var/www/$PROJECT_NAME/vendor ./vendor
       shell: bash
     
     - name: Transfer artifact to the server
@@ -194,6 +195,7 @@ runs:
         
         # Transférer l'artefact vers le serveur
         scp -r ./public-dist www-data@${{ inputs.ip }}:/var/www/$REPO_NAME/tmp
+        scp -r ./vendor www-data@${{ inputs.ip }}:/var/www/$REPO_NAME/tmp
       shell: bash
     
     - name: Set test_success output
