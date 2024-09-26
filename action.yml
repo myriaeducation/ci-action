@@ -181,19 +181,9 @@ runs:
       run: |
         # Extraire le nom du projet (après l'organisation)
         PROJECT_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-        
-        # Déterminer le répertoire de destination en fonction de la branche
-        if [ "${{ github.ref_name }}" = "master" ]; then
-          DEST_DIR="./public-dist-master"
-        else
-          DEST_DIR="./public-dist-dev"
-        fi
-        
-        # Sauvegarder DEST_DIR dans une variable d'environnement
-        echo "DEST_DIR=$DEST_DIR" >> $GITHUB_ENV
     
         # Copier le contenu depuis le conteneur Docker
-        docker cp web:/var/www/$PROJECT_NAME/public/dist $DEST_DIR
+        docker cp web:/var/www/$PROJECT_NAME/public/dist ./public-dist
       shell: bash
     
     - name: Transfer artifact to the server
@@ -203,7 +193,7 @@ runs:
         REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
         
         # Transférer l'artefact vers le serveur
-        scp -r $DEST_DIR www-data@${{ inputs.ip }}:/var/www/$REPO_NAME/tmp
+        scp -r ./public-dist www-data@${{ inputs.ip }}:/var/www/$REPO_NAME/tmp
       shell: bash
     
     - name: Set test_success output
