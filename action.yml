@@ -44,6 +44,10 @@ inputs:
     description: 'Custom Jest command'
     required: false
     default: 'npm run test --runInBand --silent'
+  ip:
+    description: 'IP address for the environment'
+    required: true
+  
 
 runs:
   using: 'composite'
@@ -146,6 +150,61 @@ runs:
         token: ${{ inputs.git_token }}
         repository: ${{ github.repository }}
         event-type: deploy-master
+        
+    - name: Dispatch deploy master
+      if: success() && github.ref == 'refs/heads/master'
+      uses: peter-evans/repository-dispatch@v2
+      with:
+        token: ${{ secrets.CR_PAT }}
+        repository: ${{ github.repository }}
+        event-type: deploy-master
+    
+    - name: Setup SSH Keys
+      if: success()
+      uses: webfactory/ssh-agent@v0.4.1
+      with:
+        ssh-private-key: ${{ inputs.ssh_private_key }}
+    
+    - name: Add server to known_hosts
+      run: |
+        ssh-keyscan -H ${{ inputs.ip }} >> ~/.ssh/known_hosts
+      shell: bash
+    
+    - name: Clean old artifact on the server
+      if: success()
+      run: |
+        ssh www-data@${{ inputs.ip }} "rm -rf /var/www/${{ github.repository }}/tmp/public-dist-dev"
+      shell: bash
+    
+    - name: Copy public/dist from container to host
+      if: success()
+      run: |
+        # Extraire le nom du projet (après l'organisation)
+        PROJECT_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+        
+        # Déterminer le répertoire de destination en fonction de la branche
+        if [ "${{ github.ref_name }}" = "master" ]; then
+          DEST_DIR="./public-dist-master"
+        else
+          DEST_DIR="./public-dist-dev"
+        fi
+        
+        # Sauvegarder DEST_DIR dans une variable d'environnement
+        echo "DEST_DIR=$DEST_DIR" >> $GITHUB_ENV
+    
+        # Copier le contenu depuis le conteneur Docker
+        docker cp web:/var/www/$PROJECT_NAME/public/dist $DEST_DIR
+      shell: bash
+    
+    - name: Transfer artifact to the server
+      if: success()
+      run: |
+        # Extraire le nom du projet (après l'organisation)
+        REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+        
+        # Transférer l'artefact vers le serveur
+        scp -r $DEST_DIR www-data@${{ inputs.ip }}:/var/www/$REPO_NAME/tmp
+      shell: bash
     
     - name: Set test_success output
       id: set_test_success_output
