@@ -63,7 +63,7 @@ runs:
   using: 'composite'
   steps:
     - id: slack
-      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/optimDeploy'
       uses: slackapi/slack-github-action@v1.25.0
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
@@ -88,7 +88,7 @@ runs:
           }
           
     - name: Get CPU cores count
-      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/optimDeploy'
       id: cpu_cores
       run: |
         if [ -n "${{ inputs.nb_workers }}" ]; then
@@ -129,7 +129,7 @@ runs:
         docker exec -u www-data web bash install-dependencies.sh
         
     - name: Build test environment
-      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/optimDeploy'
       shell: bash
       run: |
         docker exec -e NB_WORKERS=${{ steps.cpu_cores.outputs.cores }} -u www-data web bash ci.sh
@@ -137,7 +137,7 @@ runs:
     - name: PHPUnit
       id: phpunit
       uses: nick-fields/retry@v3
-      if: inputs.phpunit == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+      if: inputs.phpunit == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/optimDeploy')
       with:
         timeout_minutes: 15
         max_attempts: 2
@@ -146,7 +146,7 @@ runs:
     - name: Jest
       id: jest
       uses: nick-fields/retry@v3
-      if: inputs.jest == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+      if: inputs.jest == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/optimDeploy')
       with:
         timeout_minutes: 15
         max_attempts: 2
@@ -155,14 +155,14 @@ runs:
     - name: Behat
       id: behat && !startsWith(github.ref, 'refs/heads/release-')
       uses: nick-fields/retry@v3
-      if: inputs.behat == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+      if: inputs.behat == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/optimDeploy')
       with:
         timeout_minutes: 15
         max_attempts: 2
         command: docker exec -u www-data web bash -c "./vendor/bin/behat -l ${{ steps.cpu_cores.outputs.cores }} --suite=default --stop-on-failure"
     
     - name: Set test_success output
-      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/optimDeploy'
       id: set_test_success_output
       run: |
         if [[ "${{ inputs.behat }}" == "false" || "${{ steps.behat.outcome }}" == "success" ]] &&
@@ -229,7 +229,7 @@ runs:
         event-type: deploy-release
         
     - uses: slackapi/slack-github-action@v1.25.0
-      if: always() && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+      if: always() && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/optimDeploy')
       with:
         # You can pass in multiple channels to post to by providing a comma-delimited list of channel IDs.
         channel-id: ${{ inputs.slack_channel_id }}
