@@ -221,7 +221,7 @@ runs:
         event-type: deploy-master
         
     - name: Dispatch deploy release
-      if: success() && (startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/optimDeploy')
+      if: success() && startsWith(github.ref, 'refs/heads/release-')
       uses: peter-evans/repository-dispatch@v2
       with:
         token: ${{ inputs.git_token }}
