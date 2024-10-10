@@ -189,7 +189,7 @@ runs:
       shell: bash
 #
     - name: Transfer artifact to the recette
-      if: success() && startsWith(github.ref, 'refs/heads/release-') && inputs.ip_recette && inputs.transfer_assets
+      if: success() && (startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/optimDeploy') && inputs.ip_recette && inputs.transfer_assets
       run: |
         REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
         ssh-keyscan -H ${{ inputs.ip_recette }} >> ~/.ssh/known_hosts
@@ -221,7 +221,7 @@ runs:
         event-type: deploy-master
         
     - name: Dispatch deploy release
-      if: success() && startsWith(github.ref, 'refs/heads/release-')
+      if: success() && (startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/optimDeploy')
       uses: peter-evans/repository-dispatch@v2
       with:
         token: ${{ inputs.git_token }}
