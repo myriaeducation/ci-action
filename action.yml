@@ -178,27 +178,27 @@ runs:
       shell: bash
     
     - name: Transfer artifact to the recette
-      if: success() && startsWith(github.ref, 'refs/heads/dev') && input.ip_recette
+      if: success() && startsWith(github.ref, 'refs/heads/dev') && inputs.ip_recette
       run: |
         REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-        ssh-keyscan -H ${{ input.ip_recette }} >> ~/.ssh/known_hosts
-        rsync -avz --delete ./public-dist www-data@${{ input.ip_recette }}:/var/www/$REPO_NAME/tmp
+        ssh-keyscan -H ${{ inputs.ip_recette }} >> ~/.ssh/known_hosts
+        rsync -avz --delete ./public-dist www-data@${{ inputs.ip_recette }}:/var/www/$REPO_NAME/tmp
       shell: bash
     
     - name: Transfer artifact to the demo
-      if: success() && github.ref == 'refs/heads/master' && input.ip_demo
+      if: success() && github.ref == 'refs/heads/master' && inputs.ip_demo
       run: |
         REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-        ssh-keyscan -H ${{ input.ip_demo }} >> ~/.ssh/known_hosts
-        rsync -avz --delete ./public-dist www-data@${{ input.ip_demo }}:/var/www/$REPO_NAME/tmp
+        ssh-keyscan -H ${{ inputs.ip_demo }} >> ~/.ssh/known_hosts
+        rsync -avz --delete ./public-dist www-data@${{ inputs.ip_demo }}:/var/www/$REPO_NAME/tmp
       shell: bash
     
     - name: Transfer artifact to the prod
-      if: success() && github.ref == 'refs/heads/master' && input.ip_prod
+      if: success() && github.ref == 'refs/heads/master' && inputs.ip_prod
       run: |
         REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-        ssh-keyscan -H ${{ input.ip_prod }} >> ~/.ssh/known_hosts
-        rsync -avz --delete ./public-dist www-data@${{ input.ip_prod }}:/var/www/$REPO_NAME/tmp
+        ssh-keyscan -H ${{ inputs.ip_prod }} >> ~/.ssh/known_hosts
+        rsync -avz --delete ./public-dist www-data@${{ inputs.ip_prod }}:/var/www/$REPO_NAME/tmp
       shell: bash
     
     - name: Dispatch deploy master
