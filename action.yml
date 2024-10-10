@@ -129,7 +129,7 @@ runs:
         docker exec -u www-data web bash install-dependencies.sh
         
     - name: Build test environment
-      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/optimDeploy'
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
       shell: bash
       run: |
         docker exec -e NB_WORKERS=${{ steps.cpu_cores.outputs.cores }} -u www-data web bash ci.sh
