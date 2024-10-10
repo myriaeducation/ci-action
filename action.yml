@@ -44,6 +44,15 @@ inputs:
     description: 'Custom Jest command'
     required: false
     default: 'npm run test --runInBand --silent'
+  ip_recette:
+    description: 'IP address for the recette environment'
+    required: false
+  ip_demo:
+    description: 'IP address for the demo environment'
+    required: false
+  ip_prod:
+    description: 'IP address for the prod environment'
+    required: false
   
 
 runs:
@@ -140,28 +149,11 @@ runs:
         max_attempts: 2
         command: docker exec -u www-data web bash -c "./vendor/bin/behat -l ${{ steps.cpu_cores.outputs.cores }} --suite=default --stop-on-failure"
     
-    - name: Dispatch deploy master
-      if: success() && github.ref == 'refs/heads/master'
-      uses: peter-evans/repository-dispatch@v2
-      with:
-        token: ${{ inputs.git_token }}
-        repository: ${{ github.repository }}
-        event-type: deploy-master
-    
     - name: Setup SSH Keys
       if: success()
       uses: webfactory/ssh-agent@v0.4.1
       with:
         ssh-private-key: ${{ inputs.ssh_private_key }}
-    
-    - name: Copy public/dist from container to host
-      if: success()
-      run: |
-        PROJECT_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-    
-        # Copier le contenu depuis le conteneur Docker
-        docker cp web:/var/www/$PROJECT_NAME/public/dist ./public-dist
-      shell: bash
     
     - name: Set test_success output
       id: set_test_success_output
@@ -176,13 +168,47 @@ runs:
         fi
       shell: bash
       
-    - name: Archive public-dist directory
+    - name: Copy public/dist from container to host
       if: success()
-      uses: actions/upload-artifact@v3
-      with:
-        name: public-dist-${{ github.ref_name }}
-        path: ./public-dist
+      run: |
+        PROJECT_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+        
+        # Copier le contenu depuis le conteneur Docker
+        docker cp web:/var/www/$PROJECT_NAME/public/dist ./public-dist
+      shell: bash
     
+    - name: Transfer artifact to the recette
+      if: success() && startsWith(github.ref, 'refs/heads/dev') && input.ip_recette
+      run: |
+        REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+        ssh-keyscan -H ${{ input.ip_recette }} >> ~/.ssh/known_hosts
+        rsync -avz --delete ./public-dist www-data@${{ input.ip_recette }}:/var/www/$REPO_NAME/tmp
+      shell: bash
+    
+    - name: Transfer artifact to the demo
+      if: success() && github.ref == 'refs/heads/master' && input.ip_demo
+      run: |
+        REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+        ssh-keyscan -H ${{ input.ip_demo }} >> ~/.ssh/known_hosts
+        rsync -avz --delete ./public-dist www-data@${{ input.ip_demo }}:/var/www/$REPO_NAME/tmp
+      shell: bash
+    
+    - name: Transfer artifact to the prod
+      if: success() && github.ref == 'refs/heads/master' && input.ip_prod
+      run: |
+        REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+        ssh-keyscan -H ${{ input.ip_prod }} >> ~/.ssh/known_hosts
+        rsync -avz --delete ./public-dist www-data@${{ input.ip_prod }}:/var/www/$REPO_NAME/tmp
+      shell: bash
+    
+    - name: Dispatch deploy master
+      if: success() && github.ref == 'refs/heads/master'
+      uses: peter-evans/repository-dispatch@v2
+      with:
+        token: ${{ inputs.git_token }}
+        repository: ${{ github.repository }}
+        event-type: deploy-master
+        
     - uses: slackapi/slack-github-action@v1.25.0
       if: always()
       with:
