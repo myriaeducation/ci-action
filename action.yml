@@ -53,12 +53,17 @@ inputs:
   ip_prod:
     description: 'IP address for the prod environment'
     required: false
+  transfer_assets:
+    description: 'Transfer server assets'
+    required: false
+    default: 'true'
   
 
 runs:
   using: 'composite'
   steps:
     - id: slack
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
       uses: slackapi/slack-github-action@v1.25.0
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
@@ -83,6 +88,7 @@ runs:
           }
           
     - name: Get CPU cores count
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
       id: cpu_cores
       run: |
         if [ -n "${{ inputs.nb_workers }}" ]; then
@@ -117,7 +123,13 @@ runs:
         SLACK_NOTIFICATION_TS="${{ steps.slack.outputs.ts }}" \
         docker compose -f docker-compose-ci.yml up -d
         
+    - name: Install dependencies
+      shell: bash
+      run: |
+        docker exec -u www-data web bash install-dependencies.sh
+        
     - name: Build test environment
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
       shell: bash
       run: |
         docker exec -e NB_WORKERS=${{ steps.cpu_cores.outputs.cores }} -u www-data web bash ci.sh
@@ -125,7 +137,7 @@ runs:
     - name: PHPUnit
       id: phpunit
       uses: nick-fields/retry@v3
-      if: inputs.phpunit == 'true'
+      if: inputs.phpunit == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
       with:
         timeout_minutes: 15
         max_attempts: 2
@@ -134,28 +146,23 @@ runs:
     - name: Jest
       id: jest
       uses: nick-fields/retry@v3
-      if: inputs.jest == 'true'
+      if: inputs.jest == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
       with:
         timeout_minutes: 15
         max_attempts: 2
         command: docker exec -u www-data web bash -c "${{ inputs.jest_command }}"
         
     - name: Behat
-      id: behat
+      id: behat && !startsWith(github.ref, 'refs/heads/release-')
       uses: nick-fields/retry@v3
-      if: inputs.behat == 'true'
+      if: inputs.behat == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
       with:
         timeout_minutes: 15
         max_attempts: 2
         command: docker exec -u www-data web bash -c "./vendor/bin/behat -l ${{ steps.cpu_cores.outputs.cores }} --suite=default --stop-on-failure"
     
-    - name: Setup SSH Keys
-      if: success()
-      uses: webfactory/ssh-agent@v0.4.1
-      with:
-        ssh-private-key: ${{ inputs.ssh_private_key }}
-    
     - name: Set test_success output
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
       id: set_test_success_output
       run: |
         if [[ "${{ inputs.behat }}" == "false" || "${{ steps.behat.outcome }}" == "success" ]] &&
@@ -168,31 +175,37 @@ runs:
         fi
       shell: bash
       
+    - name: Build server assets
+      if: success() && inputs.transfer_assets
+      shell: bash
+      run: |
+        docker exec -u www-data web bash build-server-assets.sh
+      
     - name: Copy public/dist from container to host
-      if: success()
+      if: success() && inputs.transfer_assets
       run: |
         PROJECT_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
         docker cp web:/var/www/$PROJECT_NAME/public/dist ./public-dist
       shell: bash
-    
+#
     - name: Transfer artifact to the recette
-      if: success() && github.ref != 'refs/heads/master' && inputs.ip_recette
+      if: success() && startsWith(github.ref, 'refs/heads/release-') && inputs.ip_recette && inputs.transfer_assets
       run: |
         REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
         ssh-keyscan -H ${{ inputs.ip_recette }} >> ~/.ssh/known_hosts
         rsync -avz --delete ./public-dist www-data@${{ inputs.ip_recette }}:/var/www/$REPO_NAME/tmp
       shell: bash
-    
+
     - name: Transfer artifact to the demo
-      if: success() && github.ref == 'refs/heads/master' && inputs.ip_demo
+      if: success() && github.ref == 'refs/heads/master' && inputs.ip_demo && inputs.transfer_assets
       run: |
         REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
         ssh-keyscan -H ${{ inputs.ip_demo }} >> ~/.ssh/known_hosts
         rsync -avz --delete ./public-dist www-data@${{ inputs.ip_demo }}:/var/www/$REPO_NAME/tmp
       shell: bash
-    
+
     - name: Transfer artifact to the prod
-      if: success() && github.ref == 'refs/heads/master' && inputs.ip_prod
+      if: success() && github.ref == 'refs/heads/master' && inputs.ip_prod && inputs.transfer_assets
       run: |
         REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
         ssh-keyscan -H ${{ inputs.ip_prod }} >> ~/.ssh/known_hosts
@@ -207,8 +220,16 @@ runs:
         repository: ${{ github.repository }}
         event-type: deploy-master
         
+    - name: Dispatch deploy release
+      if: success() && startsWith(github.ref, 'refs/heads/release-')
+      uses: peter-evans/repository-dispatch@v2
+      with:
+        token: ${{ inputs.git_token }}
+        repository: ${{ github.repository }}
+        event-type: deploy-release
+        
     - uses: slackapi/slack-github-action@v1.25.0
-      if: always()
+      if: always() && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
       with:
         # You can pass in multiple channels to post to by providing a comma-delimited list of channel IDs.
         channel-id: ${{ inputs.slack_channel_id }}
