@@ -187,6 +187,12 @@ runs:
         PROJECT_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
         docker cp web:/var/www/$PROJECT_NAME/public/dist ./public-dist
       shell: bash
+      
+    - name: Setup SSH Keys
+      if: success() && inputs.transfer_assets
+      uses: webfactory/ssh-agent@v0.4.1
+      with:
+        ssh-private-key: ${{ inputs.ssh_private_key }}
 #
     - name: Transfer artifact to the recette
       if: success() && (startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/optimDeploy') && inputs.ip_recette && inputs.transfer_assets
