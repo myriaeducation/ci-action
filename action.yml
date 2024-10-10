@@ -219,22 +219,17 @@ runs:
       shell: bash
     
     - name: Dispatch deploy master
-      if: success() && github.ref == 'refs/heads/master'
+      if: success() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/optimDeploy')
       uses: peter-evans/repository-dispatch@v2
       with:
         token: ${{ inputs.git_token }}
         repository: ${{ github.repository }}
         event-type: deploy-master
-        client-payload: '{"sha": "${{ github.sha }}"}'
+        client-payload: |
+          {
+            "branch": "${{ github.ref }}"
+          }
     
-    - name: Dispatch deploy release
-      if: success() && (startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/optimDeploy')
-      uses: peter-evans/repository-dispatch@v2
-      with:
-        token: ${{ inputs.git_token }}
-        repository: ${{ github.repository }}
-        event-type: deploy-master
-        client-payload: '{"sha": "${{ github.sha }}"}'
     
     
     - uses: slackapi/slack-github-action@v1.25.0
