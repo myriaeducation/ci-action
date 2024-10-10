@@ -185,7 +185,7 @@ runs:
       if: success() && inputs.transfer_assets
       run: |
         PROJECT_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-        docker cp web:/var/www/$PROJECT_NAME/public/dist ./public-dist
+        docker cp web:/var/www/$PROJECT_NAME/public/dist ./public-dist-${{ github.sha }}
       shell: bash
       
     - name: Setup SSH Keys
@@ -199,7 +199,7 @@ runs:
       run: |
         REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
         ssh-keyscan -H ${{ inputs.ip_recette }} >> ~/.ssh/known_hosts
-        rsync -avz --delete ./public-dist www-data@${{ inputs.ip_recette }}:/var/www/$REPO_NAME/tmp
+        rsync -avz --delete ./public-dist-${{ github.sha }} www-data@${{ inputs.ip_recette }}:/var/www/$REPO_NAME/tmp
       shell: bash
 
     - name: Transfer artifact to the demo
@@ -207,7 +207,7 @@ runs:
       run: |
         REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
         ssh-keyscan -H ${{ inputs.ip_demo }} >> ~/.ssh/known_hosts
-        rsync -avz --delete ./public-dist www-data@${{ inputs.ip_demo }}:/var/www/$REPO_NAME/tmp
+        rsync -avz --delete ./public-dist-${{ github.sha }} www-data@${{ inputs.ip_demo }}:/var/www/$REPO_NAME/tmp
       shell: bash
 
     - name: Transfer artifact to the prod
@@ -215,7 +215,7 @@ runs:
       run: |
         REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
         ssh-keyscan -H ${{ inputs.ip_prod }} >> ~/.ssh/known_hosts
-        rsync -avz --delete ./public-dist www-data@${{ inputs.ip_prod }}:/var/www/$REPO_NAME/tmp
+        rsync -avz --delete ./public-dist-${{ github.sha }} www-data@${{ inputs.ip_prod }}:/var/www/$REPO_NAME/tmp
       shell: bash
     
     - name: Dispatch deploy master
@@ -225,7 +225,8 @@ runs:
         token: ${{ inputs.git_token }}
         repository: ${{ github.repository }}
         event-type: deploy-master
-        
+        client-payload: '{"sha": "${{ github.sha }}"}'
+    
     - name: Dispatch deploy release
       if: success() && startsWith(github.ref, 'refs/heads/release-')
       uses: peter-evans/repository-dispatch@v2
@@ -233,7 +234,9 @@ runs:
         token: ${{ inputs.git_token }}
         repository: ${{ github.repository }}
         event-type: deploy-release
-        
+        client-payload: '{"sha": "${{ github.sha }}"}'
+    
+    
     - uses: slackapi/slack-github-action@v1.25.0
       if: always() && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/optimDeploy')
       with:
