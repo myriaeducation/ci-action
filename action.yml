@@ -44,9 +44,6 @@ inputs:
     description: 'Custom Jest command'
     required: false
     default: 'npm run test --runInBand --silent'
-  ip:
-    description: 'IP address for the environment'
-    required: true
   
 
 runs:
@@ -150,32 +147,12 @@ runs:
         token: ${{ inputs.git_token }}
         repository: ${{ github.repository }}
         event-type: deploy-master
-        
-    - name: Dispatch deploy master
-      if: success() && github.ref == 'refs/heads/master'
-      uses: peter-evans/repository-dispatch@v2
-      with:
-        token: ${{ inputs.git_token }}
-        repository: ${{ github.repository }}
-        event-type: deploy-master
     
     - name: Setup SSH Keys
       if: success()
       uses: webfactory/ssh-agent@v0.4.1
       with:
         ssh-private-key: ${{ inputs.ssh_private_key }}
-    
-    - name: Add server to known_hosts
-      run: |
-        ssh-keyscan -H ${{ inputs.ip }} >> ~/.ssh/known_hosts
-      shell: bash
-    
-    - name: Clean old artifact on the server
-      if: success()
-      run: |
-        PROJECT_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-        ssh www-data@${{ inputs.ip }} "rm -rf /var/www/$PROJECT_NAME/tmp/public-dist"
-      shell: bash
     
     - name: Copy public/dist from container to host
       if: success()
@@ -184,15 +161,6 @@ runs:
     
         # Copier le contenu depuis le conteneur Docker
         docker cp web:/var/www/$PROJECT_NAME/public/dist ./public-dist
-      shell: bash
-    
-    - name: Transfer artifact to the server using rsync
-      if: success()
-      run: |
-        REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-        
-        # Utilisation de rsync sans redéfinir la clé privée
-        rsync -avz --delete ./public-dist www-data@${{ inputs.ip }}:/var/www/$REPO_NAME/tmp/public-dist
       shell: bash
     
     - name: Set test_success output
@@ -207,6 +175,13 @@ runs:
           echo "::set-output name=test_success::failure"
         fi
       shell: bash
+      
+    - name: Archive public-dist directory
+      if: success()
+      uses: actions/upload-artifact@v3
+      with:
+        name: public-dist-${{ github.ref_name }}
+        path: ./public-dist
     
     - uses: slackapi/slack-github-action@v1.25.0
       if: always()
