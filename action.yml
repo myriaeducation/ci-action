@@ -180,7 +180,7 @@ runs:
       if: success()
       uses: actions/upload-artifact@v3
       with:
-        name: public-dist-${{ github.ref_name }}
+        name: public-dist-dev
         path: ./public-dist
     
     - uses: slackapi/slack-github-action@v1.25.0
