@@ -228,7 +228,7 @@ runs:
         client-payload: '{"sha": "${{ github.sha }}"}'
     
     - name: Dispatch deploy release
-      if: success() && startsWith(github.ref, 'refs/heads/release-')
+      if: success() && (startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/optimDeploy')
       uses: peter-evans/repository-dispatch@v2
       with:
         token: ${{ inputs.git_token }}
