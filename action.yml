@@ -233,7 +233,7 @@ runs:
       with:
         token: ${{ inputs.git_token }}
         repository: ${{ github.repository }}
-        event-type: deploy-release
+        event-type: deploy-master
         client-payload: '{"sha": "${{ github.sha }}"}'
     
     
