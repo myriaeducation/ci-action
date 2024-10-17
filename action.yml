@@ -229,6 +229,33 @@ runs:
         rsync -avz --delete ./public-dist-${{ github.sha }} www-data@${{ inputs.ip_prod }}:/var/www/$REPO_NAME/tmp
       shell: bash
     
+    - uses: slackapi/slack-github-action@v1.25.0
+      if: ${{ always() && contains('master,dev,optimDeploy', github.ref_name) }}
+      with:
+        # You can pass in multiple channels to post to by providing a comma-delimited list of channel IDs.
+        channel-id: ${{ inputs.slack_channel_id }}
+        # For posting a simple plain text message
+        update-ts: ${{ steps.slack.outputs.ts }}
+        payload: |
+          {
+            "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ steps.set_test_success_output.outputs.test_success }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "attachments": [
+              {
+                "pretext": "Build Status: ${{ steps.set_test_success_output.outputs.test_success }}",
+                "color": "${{ steps.set_test_success_output.outputs.test_success == 'success' && '28a745' || 'ff0000' }}",
+                "fields": [
+                  {
+                    "title": "Status",
+                    "short": true,
+                    "value": "${{ steps.set_test_success_output.outputs.test_success == 'success' && 'Completed' || 'Failure' }}"
+                  }
+                ]
+              }
+            ]
+          }
+      env:
+        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
+        
     - name: Deploy to recette
       uses: cartesiaeducation/deploy-action@v1
       if: (startsWith(github.ref, 'refs/heads/release-') || startsWith(github.ref, 'refs/heads/optimDeploy')) && inputs.deploy_to_recette == 'true'
@@ -264,30 +291,3 @@ runs:
         ip: ${{ inputs.ip_prod }}
         stage: 'prod'
         branch: 'master'
-    
-    - uses: slackapi/slack-github-action@v1.25.0
-      if: ${{ always() && contains('master,dev,optimDeploy', github.ref_name) }}
-      with:
-        # You can pass in multiple channels to post to by providing a comma-delimited list of channel IDs.
-        channel-id: ${{ inputs.slack_channel_id }}
-        # For posting a simple plain text message
-        update-ts: ${{ steps.slack.outputs.ts }}
-        payload: |
-          {
-            "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ steps.set_test_success_output.outputs.test_success }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
-            "attachments": [
-              {
-                "pretext": "Build Status: ${{ steps.set_test_success_output.outputs.test_success }}",
-                "color": "${{ steps.set_test_success_output.outputs.test_success == 'success' && '28a745' || 'ff0000' }}",
-                "fields": [
-                  {
-                    "title": "Status",
-                    "short": true,
-                    "value": "${{ steps.set_test_success_output.outputs.test_success == 'success' && 'Completed' || 'Failure' }}"
-                  }
-                ]
-              }
-            ]
-          }
-      env:
-        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
