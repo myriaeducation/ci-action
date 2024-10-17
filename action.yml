@@ -233,11 +233,11 @@ runs:
       uses: cartesiaeducation/deploy-action@v1
       if: (startsWith(github.ref, 'refs/heads/release-') || startsWith(github.ref, 'refs/heads/optimDeploy')) && inputs.deploy_to_recette == 'true'
       with:
-        slack_bot_token: ${{ secrets.SLACK_TOKEN }}
-        slack_channel_id: ${{ vars.SLACK_NOTIFICATION_CHANNEL_ID }}
-        ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
-        git_organization: ${{ vars.GIT_ORGANIZATION }}
-        ip: ${{ vars.IP_RECETTE }}
+        slack_bot_token: ${{ inputs.slack_bot_token }}
+        slack_channel_id: ${{ inputs.slack_channel_id }}
+        ssh_private_key: ${{ inputs.ssh_private_key }}
+        git_organization: ${{ inputs.git_organization }}
+        ip: ${{ inputs.ip_recette }}
         stage: 'recette'
         branch: ${{ github.ref_name }}
     
@@ -245,11 +245,11 @@ runs:
       uses: cartesiaeducation/deploy-action@v1
       if: github.ref == 'refs/heads/master' && inputs.deploy_to_demo == 'true'
       with:
-        slack_bot_token: ${{ secrets.SLACK_TOKEN }}
-        slack_channel_id: ${{ vars.SLACK_NOTIFICATION_CHANNEL_ID }}
-        ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
-        git_organization: ${{ vars.GIT_ORGANIZATION }}
-        ip: ${{ vars.IP_DEMO }}
+        slack_bot_token: ${{ inputs.slack_bot_token }}
+        slack_channel_id: ${{ inputs.slack_channel_id }}
+        ssh_private_key: ${{ inputs.ssh_private_key }}
+        git_organization: ${{ inputs.git_organization }}
+        ip: ${{ inputs.ip_demo }}
         stage: 'staging'
         branch: 'master'
     
@@ -257,11 +257,11 @@ runs:
       uses: cartesiaeducation/deploy-action@v1
       if: github.ref == 'refs/heads/master' && inputs.deploy_to_prod == 'true'
       with:
-        slack_bot_token: ${{ secrets.SLACK_TOKEN }}
-        slack_channel_id: ${{ vars.SLACK_NOTIFICATION_CHANNEL_ID }}
-        ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
-        git_organization: ${{ vars.GIT_ORGANIZATION }}
-        ip: ${{ vars.IP_PROD }}
+        slack_bot_token: ${{ inputs.slack_bot_token }}
+        slack_channel_id: ${{ inputs.slack_channel_id }}
+        ssh_private_key: ${{ inputs.ssh_private_key }}
+        git_organization: ${{ inputs.git_organization }}
+        ip: ${{ inputs.ip_prod }}
         stage: 'prod'
         branch: 'master'
     
