@@ -306,6 +306,7 @@ runs:
         branch: 'master'
     
     - name: Create Sentry release
+      if: github.ref == 'refs/heads/master' && inputs.deploy_to_prod == 'true'
       uses: getsentry/action-release@v1
       env:
         SENTRY_AUTH_TOKEN: ${{ inputs.sentry_auth_token }}
