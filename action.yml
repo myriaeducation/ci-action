@@ -201,13 +201,13 @@ runs:
       shell: bash
     
     - name: Build server assets
-      if: success() && inputs.transfer_assets && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release-'))
+      if: success() && inputs.transfer_assets == 'true' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release-'))
       shell: bash
       run: |
         docker exec -u www-data web bash build-server-assets.sh
     
     - name: Copy public/dist from container to host
-      if: success() && inputs.transfer_assets && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release-'))
+      if: success() && inputs.transfer_assets == 'true' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release-'))
       run: |
         PROJECT_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
         docker cp web:/var/www/$PROJECT_NAME/public/dist ./public-dist-${{ github.sha }}
@@ -215,13 +215,13 @@ runs:
       shell: bash
     
     - name: Setup SSH Keys
-      if: success() && inputs.transfer_assets && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release-'))
+      if: success() && inputs.transfer_assets == 'true' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release-'))
       uses: webfactory/ssh-agent@v0.4.1
       with:
         ssh-private-key: ${{ inputs.ssh_private_key }}
     #
     - name: Transfer artifact to the recette
-      if: success() && startsWith(github.ref, 'refs/heads/release-') && inputs.ip_recette && inputs.transfer_assets
+      if: success() && startsWith(github.ref, 'refs/heads/release-') && inputs.ip_recette && inputs.transfer_assets == 'true'
       run: |
         REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
         ssh-keyscan -H ${{ inputs.ip_recette }} >> ~/.ssh/known_hosts
@@ -230,7 +230,7 @@ runs:
       shell: bash
     
     - name: Transfer artifact to the demo
-      if: success() && github.ref == 'refs/heads/master' && inputs.ip_demo && inputs.transfer_assets
+      if: success() && github.ref == 'refs/heads/master' && inputs.ip_demo && inputs.transfer_assets == 'true'
       run: |
         REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
         ssh-keyscan -H ${{ inputs.ip_demo }} >> ~/.ssh/known_hosts
@@ -239,7 +239,7 @@ runs:
       shell: bash
     
     - name: Transfer artifact to the prod
-      if: success() && github.ref == 'refs/heads/master' && inputs.ip_prod && inputs.transfer_assets
+      if: success() && github.ref == 'refs/heads/master' && inputs.ip_prod && inputs.transfer_assets == 'true'
       run: |
         REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
         ssh-keyscan -H ${{ inputs.ip_prod }} >> ~/.ssh/known_hosts
