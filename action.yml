@@ -83,7 +83,6 @@ runs:
   using: 'composite'
   steps:
     - id: slack
-      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
       uses: slackapi/slack-github-action@v1.25.0
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
@@ -243,7 +242,7 @@ runs:
       shell: bash
     
     - uses: slackapi/slack-github-action@v1.25.0
-      if: ${{ always() && contains('master,dev', github.ref_name) }}
+      if: ${{ always() }}
       with:
         # You can pass in multiple channels to post to by providing a comma-delimited list of channel IDs.
         channel-id: ${{ inputs.slack_channel_id }}
