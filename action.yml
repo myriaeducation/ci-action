@@ -181,16 +181,22 @@ runs:
         command: docker exec -u www-data web bash -c "./vendor/bin/behat -l ${{ steps.cpu_cores.outputs.cores }} --suite=default --stop-on-failure"
     
     - name: Set test_success output
-      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
       id: set_test_success_output
       run: |
-        if [[ "${{ inputs.behat }}" == "false" || "${{ steps.behat.outcome }}" == "success" ]] &&
-           [[ "${{ inputs.phpunit }}" == "false" || "${{ steps.phpunit.outcome }}" == "success" ]] &&
-           [[ "${{ inputs.jest }}" == "false" || "${{ steps.jest.outcome }}" == "success" ]]
-        then
+        branch_name=${GITHUB_REF#refs/heads/}
+        if [[ "$branch_name" =~ ^release- ]]; then
+          # Si la branche commence par release- : succès immédiat
           echo "::set-output name=test_success::success"
         else
-          echo "::set-output name=test_success::failure"
+          # Sinon, vérifier les résultats des tests
+          if [[ "${{ inputs.behat }}" == "false" || "${{ steps.behat.outcome }}" == "success" ]] &&
+             [[ "${{ inputs.phpunit }}" == "false" || "${{ steps.phpunit.outcome }}" == "success" ]] &&
+             [[ "${{ inputs.jest }}" == "false" || "${{ steps.jest.outcome }}" == "success" ]]
+          then
+            echo "::set-output name=test_success::success"
+          else
+            echo "::set-output name=test_success::failure"
+          fi
         fi
       shell: bash
     
