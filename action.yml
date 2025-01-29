@@ -318,4 +318,4 @@ runs:
         SENTRY_ORG: ${{ inputs.sentry_org }}
         SENTRY_PROJECT: ${{ inputs.sentry_project }}
       with:
-        environment: production
+        environment: prod
