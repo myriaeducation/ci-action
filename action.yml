@@ -133,7 +133,7 @@ runs:
               "pretext": "🐳 Docker en cours...",
               "color": "dbab09",
               "fields": [
-                { "title": "Docker", "value": "✅ Terminé", "short": true }
+                { "title": "Docker", "value": "⏳ En cours...", "short": true }
               ]
             }]
           }
@@ -178,7 +178,7 @@ runs:
               "pretext": "📦 Installation des dépendances...",
               "color": "dbab09",
               "fields": [
-                { "title": "Dépendances", "value": "✅ Installées", "short": true }
+                { "title": "Dépendances", "value": "⏳ En cours...", "short": true }
               ]
             }]
           }
