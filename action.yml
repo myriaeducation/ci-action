@@ -356,24 +356,24 @@ runs:
                     "short": true,
                     "value": "${{ env.test_success == 'success' && '✅ Completed' || '❌ Failure' }}"
                   }
-                  ${{ env.show_test_status == 'true' && ',' || '' }}
-                  ${{ env.show_test_status == 'true' && '{
+                  {{#if env.show_test_status == 'true'}}
+                  ,
+                  {
                     "title": "PHPUnit",
                     "short": true,
                     "value": "${{ inputs.phpunit == 'false' && '⚪ Non applicable' || (steps.phpunit.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"
-                  }' || '' }}
-                  ${{ env.show_test_status == 'true' && ',' || '' }}
-                  ${{ env.show_test_status == 'true' && '{
+                  },
+                  {
                     "title": "Jest",
                     "short": true,
                     "value": "${{ inputs.jest == 'false' && '⚪ Non applicable' || (steps.jest.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"
-                  }' || '' }}
-                  ${{ env.show_test_status == 'true' && ',' || '' }}
-                  ${{ env.show_test_status == 'true' && '{
+                  },
+                  {
                     "title": "Behat",
                     "short": true,
                     "value": "${{ inputs.behat == 'false' && '⚪ Non applicable' || (steps.behat.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"
-                  }' || '' }}
+                  }
+                  {{/if}}
                 ]
               }
             ]
