@@ -93,7 +93,7 @@ runs:
             "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) 🚀",
             "attachments": [{ "pretext": "Initialisation", "color": "dbab09" }]
           }
-          
+    
     - name: Get CPU cores count
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
       id: cpu_cores
@@ -108,7 +108,12 @@ runs:
     - name: Login to Docker
       run: echo "${{ inputs.git_token }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
       shell: bash
-      
+    
+    # —— Setup Github actions 🐙 ————————————————————————————————————————————————
+    # https://github.com/actions/checkout (official)
+    - name: Checkout
+      uses: actions/checkout@v4
+    
     - name: Mount project
       shell: bash
       run: |
@@ -180,6 +185,24 @@ runs:
         timeout_minutes: 15
         max_attempts: 2
         command: docker exec -u www-data web bash -c "./vendor/bin/behat -l ${{ steps.cpu_cores.outputs.cores }} --suite=default --stop-on-failure"
+        
+    # 📌 Capture du statut des tests
+    - name: Set test_success output
+      id: set_test_success_output
+      run: |
+        branch_name=${GITHUB_REF#refs/heads/}
+        if [[ "$branch_name" =~ ^release- ]]; then
+          echo "test_success=success" >> $GITHUB_ENV
+        else
+          if [[ "${{ inputs.behat }}" == "false" || "${{ steps.behat.outcome }}" == "success" ]] &&
+             [[ "${{ inputs.phpunit }}" == "false" || "${{ steps.phpunit.outcome }}" == "success" ]] &&
+             [[ "${{ inputs.jest }}" == "false" || "${{ steps.jest.outcome }}" == "success" ]]; then
+            echo "test_success=success" >> $GITHUB_ENV
+          else
+            echo "test_success=failure" >> $GITHUB_ENV
+          fi
+        fi
+      shell: bash
     
     # 📌 Mise à jour Slack - Build et transfert des assets
     - name: Slack - Build des assets
@@ -209,7 +232,7 @@ runs:
           { "attachments": [{ "pretext": "🚀 Déploiement en cours...", "color": "dbab09" }] }
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
-        
+    
     - uses: ruby/setup-ruby@v1
       if: startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/master'
       with:
@@ -217,19 +240,42 @@ runs:
         bundler-cache: true
     
     - name: Deploy to recette
+      id: deploy_recette
       if: startsWith(github.ref, 'refs/heads/release-') && inputs.deploy_to_recette == 'true'
       run: BRANCH=${{ github.ref_name }} IP=${{ inputs.ip_recette }} bundle exec cap recette deploy
       shell: bash
     
     - name: Deploy to demo
+      id: deploy_demo
       if: github.ref == 'refs/heads/master' && inputs.deploy_to_demo == 'true'
       run: BRANCH=${{ github.ref_name }} IP=${{ inputs.ip_demo }} bundle exec cap staging deploy
       shell: bash
     
     - name: Deploy to prod
+      id: deploy_prod
       if: github.ref == 'refs/heads/master' && inputs.deploy_to_prod == 'true'
       run: BRANCH=${{ github.ref_name }} IP=${{ inputs.ip_prod }} bundle exec cap prod deploy
       shell: bash
+    
+    - name: Set deploy_success output
+      id: deploy_success
+      shell: bash
+      run: |
+        if [[ "${{ github.ref }}" == refs/heads/release-* || "${{ github.ref }}" == refs/heads/master ]]; then
+          DEPLOYMENT_SUCCESS=true
+          if [[ "${{ inputs.deploy_to_recette }}" == 'true' && "${{ steps.deploy_recette.outcome }}" != 'success' ]]; then
+            DEPLOYMENT_SUCCESS=false
+          fi
+          if [[ "${{ inputs.deploy_to_demo }}" == 'true' && "${{ steps.deploy_demo.outcome }}" != 'success' ]]; then
+            DEPLOYMENT_SUCCESS=false
+          fi
+          if [[ "${{ inputs.deploy_to_prod }}" == 'true' && "${{ steps.deploy_prod.outcome }}" != 'success' ]]; then
+            DEPLOYMENT_SUCCESS=false
+          fi
+          echo "deploy_success=$DEPLOYMENT_SUCCESS" >> $GITHUB_ENV
+        else
+          echo "deploy_success=true" >> $GITHUB_ENV
+        fi
     
     # 📌 Slack - Mise à jour finale (succès ou échec)
     - name: Slack - Statut final
@@ -244,9 +290,10 @@ runs:
             "attachments": [
               {
                 "pretext": "📝 Statut final",
-                "color": "${{ job.status == 'success' && '28a745' || 'ff0000' }}",
+                "color": "${{ env.test_success == 'success' && env.deploy_success == 'success' && '28a745' || 'ff0000' }}",
                 "fields": [
-                  { "title": "Status", "value": "${{ job.status == 'success' && '✅ Succès' || '❌ Échec' }}", "short": true }
+                  { "title": "Tests", "value": "${{ env.test_success == 'success' && '✅ Réussis' || '❌ Échec' }}", "short": true },
+                  { "title": "Déploiement", "value": "${{ env.deploy_success == 'success' && '✅ Réussi' || '❌ Échec' }}", "short": true }
                 ]
               }
             ]
