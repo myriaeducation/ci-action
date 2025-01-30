@@ -426,38 +426,38 @@ runs:
           
           # Ajout des statuts de tests uniquement si `SHOW_TEST_STATUS == true`
           if [[ "$SHOW_TEST_STATUS" == "true" ]]; then
-          cat <<EOF >> "$FILE_PATH"
-          ,
+            cat <<EOF >> "$FILE_PATH"
+            ,
+            {
+              "title": "PHPUnit",
+              "short": true,
+              "value": "${PHPUNIT_STATUS}"
+            },
           {
-            "title": "PHPUnit",
+            "title": "Jest",
             "short": true,
-            "value": "${PHPUNIT_STATUS}"
+            "value": "${JEST_STATUS}"
           },
-        {
-          "title": "Jest",
-          "short": true,
-          "value": "${JEST_STATUS}"
-        },
-        {
-          "title": "Behat",
-          "short": true,
-          "value": "${BEHAT_STATUS}"
-        }
-        EOF
+          {
+            "title": "Behat",
+            "short": true,
+            "value": "${BEHAT_STATUS}"
+          }
+          EOF
         fi
         
         # Fermeture propre du JSON
         cat <<EOF >> "$FILE_PATH"
-      ]
-      }
-      ]
-      }
+              ]
+              }
+            ]
+          }
         EOF
         
         # Vérification que le fichier a bien été créé
         if [[ ! -f "$FILE_PATH" ]]; then
-        echo "❌ Erreur: le fichier $FILE_PATH n'a pas été créé !" >&2
-        exit 1
+          echo "❌ Erreur: le fichier $FILE_PATH n'a pas été créé !" >&2
+          exit 1
         fi
         
         echo "✅ Fichier JSON généré avec succès: $FILE_PATH"
