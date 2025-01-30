@@ -392,56 +392,67 @@ runs:
     
     - name: Set Slack Payload
       id: slack_payload
+      shell: bash
+      env:
+        TEST_SUCCESS: ${{ env.test_success }}
+        TEST_COLOR: ${{ env.test_success == 'success' && '28a745' || 'ff0000' }}
+        TEST_STATUS: ${{ env.test_success == 'success' && '✅ Completed' || '❌ Failure' }}
+        SHOW_TEST_STATUS: ${{ env.show_test_status }}
+        PHPUNIT_STATUS: ${{ inputs.phpunit == 'false' && '⚪ N/A' || (steps.phpunit.outcome == 'success' && '✅ Passed' || '❌ Failed') }}
+        JEST_STATUS: ${{ inputs.jest == 'false' && '⚪ N/A' || (steps.jest.outcome == 'success' && '✅ Passed' || '❌ Failed') }}
+        BEHAT_STATUS: ${{ inputs.behat == 'false' && '⚪ N/A' || (steps.behat.outcome == 'success' && '✅ Passed' || '❌ Failed') }}
       run: |
+        set -e  # Stoppe immédiatement le script en cas d'erreur
+        
         FILE_PATH="${GITHUB_WORKSPACE}/slack_payload.json"
         
-        # Création du JSON
-        echo '{
-          "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ env.test_success }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+        echo "Création du fichier JSON à : $FILE_PATH"
+        
+        # Création du JSON proprement
+        cat <<EOF > "$FILE_PATH"
+        {
+          "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch \`${{ github.ref_name }}\`: ${TEST_SUCCESS} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
           "attachments": [
             {
-              "pretext": "Build Status: '"${{ env.test_success }}"'",
-              "color": "'"${{ env.test_success == 'success' && '28a745' || 'ff0000' }}"'",
+              "pretext": "Build Status: ${TEST_SUCCESS}",
+              "color": "${TEST_COLOR}",
               "fields": [
                 {
                   "title": "Status",
                   "short": true,
-                  "value": "'"${{ env.test_success == 'success' && '✅ Completed' || '❌ Failure' }}"'"
-                }' > "$FILE_PATH"
-        
-        # Ajout des statuts de tests uniquement si `show_test_status == true`
-        if [[ "${{ env.show_test_status }}" == "true" ]]; then
-          echo ', {
+                  "value": "${TEST_STATUS}"
+                }
+                EOF
+                  
+                  # Vérifier la valeur de `show_test_status`
+                  if [ [ "$SHOW_TEST_STATUS" == "true" ] ]; then
+                  cat <<EOF >> "$FILE_PATH"
+                ,
+                {
                   "title": "PHPUnit",
                   "short": true,
-                  "value": "'"${{ inputs.phpunit == 'false' && '⚪ Non applicable' || (steps.phpunit.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"'"
+                  "value": "${PHPUNIT_STATUS}"
                 },
                 {
                   "title": "Jest",
                   "short": true,
-                  "value": "'"${{ inputs.jest == 'false' && '⚪ Non applicable' || (steps.jest.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"'"
+                  "value": "${JEST_STATUS}"
                 },
                 {
                   "title": "Behat",
                   "short": true,
-                  "value": "'"${{ inputs.behat == 'false' && '⚪ Non applicable' || (steps.behat.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"'"
-                }' >> "$FILE_PATH"
-        fi
-        
-        # Fermeture du JSON proprement
-        echo '
+                  "value": "${BEHAT_STATUS}"
+                }
+                EOF
+                  fi
+                  
+                  # Fermeture propre du JSON
+                  cat <<EOF >> "$FILE_PATH"
               ]
             }
           ]
-        }' >> "$FILE_PATH"
-        
-        # Vérification que le fichier a bien été créé
-        if [[ ! -f "$FILE_PATH" ]]; then
-          echo "Erreur : le fichier $FILE_PATH n'a pas été créé !" >&2
-          exit 1
-        fi
-      
-      shell: bash
+        }
+        EOF
     
     - name: Slack - Build Status
       uses: slackapi/slack-github-action@v1.25.0
