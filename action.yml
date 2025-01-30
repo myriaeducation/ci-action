@@ -130,7 +130,6 @@ runs:
           {
              "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
             "attachments": [{
-              "pretext": "🐳 Docker en cours...",
               "color": "dbab09",
               "fields": [
                 { "title": "Docker", "value": "⏳ En cours...", "short": true }
@@ -175,10 +174,9 @@ runs:
           {
              "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
             "attachments": [{
-              "pretext": "📦 Installation des dépendances...",
               "color": "dbab09",
               "fields": [
-                { "title": "Dépendances", "value": "⏳ En cours...", "short": true }
+                { "title": "Installation des dépendances...", "value": "⏳ En cours...", "short": true }
               ]
             }]
           }
@@ -201,10 +199,9 @@ runs:
           {
              "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
             "attachments": [{
-              "pretext": "🧪 Exécution des tests...",
               "color": "dbab09",
               "fields": [
-                { "title": "Tests", "value": "⏳ En cours...", "short": true }
+                { "title": "🧪 Exécution des tests...", "value": "⏳ En cours...", "short": true }
               ]
             }]
           }
@@ -280,10 +277,9 @@ runs:
           {
             "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
             "attachments": [{
-              "pretext": "📂 Transfert des assets...",
               "color": "dbab09",
               "fields": [
-                { "title": "Transfert des assets", "value": "⏳ En cours...", "short": true }
+                { "title": "📂 Transfert des assets...", "value": "⏳ En cours...", "short": true }
               ]
             }]
           }
