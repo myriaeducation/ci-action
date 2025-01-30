@@ -93,6 +93,37 @@ runs:
             "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) 🚀",
             "attachments": [{ "pretext": "Initialisation", "color": "dbab09" }]
           }
+          
+    - name: Get CPU cores count
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
+      id: cpu_cores
+      run: |
+        if [ -n "${{ inputs.nb_workers }}" ]; then
+          echo "::set-output name=cores::${{ inputs.nb_workers }}"
+        else
+          echo "::set-output name=cores::$(nproc)"
+        fi
+      shell: bash
+    
+    - name: Login to Docker
+      run: echo "${{ inputs.git_token }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+      shell: bash
+      
+    - name: Mount project
+      shell: bash
+      run: |
+        CUSTOM_ENV_VARS=$(echo '${{ inputs.custom_env }}' | jq -r 'to_entries|map("export \(.key)=\(.value|tostring)")|.[]')
+        eval "$CUSTOM_ENV_VARS"
+        DEPENDENCIES_BRANCH=$(echo ${GITHUB_REF#refs/heads/}) \
+        SSH_PRIVATE_KEY="${{ inputs.ssh_private_key }}" \
+        CR_PAT="${{ inputs.git_token }}" \
+        ADMIN_DOMAIN="${{ inputs.admin_domain }}" \
+        CORPORATE_DOMAIN="${{ inputs.corporate_domain }}" \
+        GIT_ORGANIZATION="${{ inputs.git_organization }}" \
+        SLACK_TOKEN="${{ inputs.slack_bot_token }}" \
+        IS_CI="true" \
+        SLACK_NOTIFICATION_TS="${{ steps.slack.outputs.ts }}" \
+        docker compose -f docker-compose-ci.yml up -d
     
     - name: Store Slack message timestamp
       run: echo "SLACK_TS=${{ steps.slack.outputs.ts }}" >> $GITHUB_ENV
