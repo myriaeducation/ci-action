@@ -336,52 +336,45 @@ runs:
     - name: Set Slack Payload
       id: slack_payload
       run: |
-        JSON_PAYLOAD=$(cat <<EOF
-        {
+        # Définition de la variable JSON
+        JSON_PAYLOAD='{
           "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ env.test_success }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
           "attachments": [
             {
               "pretext": "Build Status: ${{ env.test_success }}",
-              "color": "${{ env.test_success == 'success' && '28a745' || 'ff0000' }}",
+              "color": "'${{ env.test_success == 'success' && '28a745' || 'ff0000' }}'",
               "fields": [
                 {
                   "title": "Status",
                   "short": true,
-                  "value": "${{ env.test_success == 'success' && '✅ Completed' || '❌ Failure' }}"
-                }
-                EOF
-        )
+                  "value": "'${{ env.test_success == 'success' && '✅ Completed' || '❌ Failure' }}'"
+                }'
         
+        # Ajout des statuts de test seulement si `show_test_status` est vrai
         if [[ "${{ env.show_test_status }}" == "true" ]]; then
-          JSON_PAYLOAD+=$(cat <<EOF
-                ,
-                {
-                  "title": "PHPUnit",
-                  "short": true,
-                  "value": "${{ inputs.phpunit == 'false' && '⚪ Non applicable' || (steps.phpunit.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"
-                },
-                {
-                  "title": "Jest",
-                  "short": true,
-                  "value": "${{ inputs.jest == 'false' && '⚪ Non applicable' || (steps.jest.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"
-                },
-                {
-                  "title": "Behat",
-                  "short": true,
-                  "value": "${{ inputs.behat == 'false' && '⚪ Non applicable' || (steps.behat.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"
-                }
-          EOF
-          )
+          JSON_PAYLOAD+=', {
+            "title": "PHPUnit",
+            "short": true,
+            "value": "'${{ inputs.phpunit == 'false' && '⚪ Non applicable' || (steps.phpunit.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}'"
+          }, {
+            "title": "Jest",
+            "short": true,
+            "value": "'${{ inputs.jest == 'false' && '⚪ Non applicable' || (steps.jest.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}'"
+          }, {
+            "title": "Behat",
+            "short": true,
+            "value": "'${{ inputs.behat == 'false' && '⚪ Non applicable' || (steps.behat.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}'"
+          }'
         fi
         
-        JSON_PAYLOAD+=$(cat <<EOF
+        # Fermeture du JSON proprement
+        JSON_PAYLOAD+='
               ]
             }
           ]
-        }
-        EOF
-        )
+        }'
         
+        # Écriture du fichier JSON proprement
         echo "$JSON_PAYLOAD" > slack_payload.json
       shell: bash
     
