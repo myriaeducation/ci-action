@@ -147,6 +147,8 @@ runs:
     # https://github.com/actions/checkout (official)
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        ref: ${{ github.sha }}
     
     - name: Mount project
       shell: bash
@@ -432,6 +434,7 @@ runs:
       shell: bash
     
     - name: Générer le message Slack final
+      if: always()
       run: |
         FILE_PATH="${GITHUB_WORKSPACE}/slack_payload.json"
         
@@ -477,8 +480,6 @@ runs:
         payload-file-path: "${{ github.workspace }}/slack_payload.json"
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
-    
-    
     
     - name: Deploy to recette
       uses: cartesiaeducation/deploy-action@v1
