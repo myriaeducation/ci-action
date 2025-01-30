@@ -205,7 +205,6 @@ runs:
     
     # 📌 Initialiser les statuts des tests uniquement si SHOW_TEST_STATUS=true
     - name: Initialiser les statuts des tests
-      if: env.SHOW_TEST_STATUS == 'true'
       run: |
         echo "PHPUNIT_STATUS=⚪ N/A" >> $GITHUB_ENV
         echo "JEST_STATUS=⚪ N/A" >> $GITHUB_ENV
