@@ -219,7 +219,7 @@ runs:
         update-ts: ${{ env.SLACK_TS }}
         payload: |
           {
-             "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
             "attachments": [{
               "color": "dbab09",
               "fields": [
@@ -244,7 +244,7 @@ runs:
         update-ts: ${{ env.SLACK_TS }}
         payload: |
           {
-            "text": "📌 Tests en cours (`${{ github.ref_name }}`) 🚀",
+            "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
             "attachments": [{
               "color": "dbab09",
               "fields": [
@@ -286,7 +286,7 @@ runs:
         update-ts: ${{ env.SLACK_TS }}
         payload: |
           {
-            "text": "📌 Tests en cours (`${{ github.ref_name }}`) 🚀",
+            "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
             "attachments": [{
               "color": "dbab09",
               "fields": [
@@ -326,7 +326,7 @@ runs:
         update-ts: ${{ env.SLACK_TS }}
         payload: |
           {
-            "text": "📌 Tests en cours (`${{ github.ref_name }}`) 🚀",
+            "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
             "attachments": [{
               "color": "dbab09",
               "fields": [
@@ -429,6 +429,7 @@ runs:
       shell: bash
     
     - name: Générer le message Slack final
+      if: always()
       id: generate_slack_payload
       run: |
         FILE_PATH="${GITHUB_WORKSPACE}/slack_payload.json"
@@ -468,6 +469,7 @@ runs:
     
     # 📌 Envoyer le message Slack final
     - name: Slack - Résultat final des tests
+      if: always()
       uses: slackapi/slack-github-action@v1.25.0
       with:
         channel-id: ${{ inputs.slack_channel_id }}
