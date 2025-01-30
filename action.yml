@@ -336,46 +336,57 @@ runs:
     - name: Set Slack Payload
       id: slack_payload
       run: |
-        # Définition de la variable JSON
-        JSON_PAYLOAD='{
+        FILE_PATH="${GITHUB_WORKSPACE}/slack_payload.json"
+        
+        # Création du JSON
+        echo '{
           "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ env.test_success }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
           "attachments": [
             {
-              "pretext": "Build Status: ${{ env.test_success }}",
-              "color": "'${{ env.test_success == 'success' && '28a745' || 'ff0000' }}'",
+              "pretext": "Build Status: '"${{ env.test_success }}"'",
+              "color": "'"${{ env.test_success == 'success' && '28a745' || 'ff0000' }}"'",
               "fields": [
                 {
                   "title": "Status",
                   "short": true,
-                  "value": "'${{ env.test_success == 'success' && '✅ Completed' || '❌ Failure' }}'"
-                }'
+                  "value": "'"${{ env.test_success == 'success' && '✅ Completed' || '❌ Failure' }}"'"
+                }' > "$FILE_PATH"
         
-        # Ajout des statuts de test seulement si `show_test_status` est vrai
+        # Ajout des statuts de tests uniquement si `show_test_status == true`
         if [[ "${{ env.show_test_status }}" == "true" ]]; then
-          JSON_PAYLOAD+=', {
-            "title": "PHPUnit",
-            "short": true,
-            "value": "'${{ inputs.phpunit == 'false' && '⚪ Non applicable' || (steps.phpunit.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}'"
-          }, {
-            "title": "Jest",
-            "short": true,
-            "value": "'${{ inputs.jest == 'false' && '⚪ Non applicable' || (steps.jest.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}'"
-          }, {
-            "title": "Behat",
-            "short": true,
-            "value": "'${{ inputs.behat == 'false' && '⚪ Non applicable' || (steps.behat.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}'"
-          }'
+          echo ', {
+                  "title": "PHPUnit",
+                  "short": true,
+                  "value": "'"${{ inputs.phpunit == 'false' && '⚪ Non applicable' || (steps.phpunit.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"'"
+                },
+                {
+                  "title": "Jest",
+                  "short": true,
+                  "value": "'"${{ inputs.jest == 'false' && '⚪ Non applicable' || (steps.jest.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"'"
+                },
+                {
+                  "title": "Behat",
+                  "short": true,
+                  "value": "'"${{ inputs.behat == 'false' && '⚪ Non applicable' || (steps.behat.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"'"
+                }' >> "$FILE_PATH"
         fi
         
-        # Fermeture du JSON proprement
-        JSON_PAYLOAD+='
+        # Fermeture du JSON
+        echo '
               ]
             }
           ]
-        }'
+        }' >> "$FILE_PATH"
         
-        # Écriture du fichier JSON proprement
-        echo "$JSON_PAYLOAD" > slack_payload.json
+        # Vérification que le fichier a bien été créé
+        if [[ ! -f "$FILE_PATH" ]]; then
+          echo "Erreur : le fichier $FILE_PATH n'a pas été créé !" >&2
+          exit 1
+        fi
+      shell: bash
+    
+    - name: Debug - Check JSON File
+      run: cat ${GITHUB_WORKSPACE}/slack_payload.json
       shell: bash
     
     - name: Slack - Build Status
@@ -384,9 +395,10 @@ runs:
       with:
         channel-id: ${{ inputs.slack_channel_id }}
         update-ts: ${{ env.SLACK_TS }}
-        payload-file-path: ./slack_payload.json
+        payload-file-path: ${GITHUB_WORKSPACE}/slack_payload.json
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
+    
     
     
     - name: Deploy to recette
