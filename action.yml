@@ -178,6 +178,12 @@ runs:
           { "attachments": [{ "pretext": "🚀 Déploiement en cours...", "color": "dbab09" }] }
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
+        
+    - uses: ruby/setup-ruby@v1
+      if: startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/master'
+      with:
+        ruby-version: '3.3'
+        bundler-cache: true
     
     - name: Deploy to recette
       if: startsWith(github.ref, 'refs/heads/release-') && inputs.deploy_to_recette == 'true'
