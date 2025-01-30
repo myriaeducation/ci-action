@@ -428,27 +428,54 @@ runs:
         rsync -avz --delete ./public-bundles-${{ github.sha }} www-data@${{ inputs.ip_prod }}:/var/www/$REPO_NAME/tmp
       shell: bash
     
+    - name: Générer le message Slack final
+      id: generate_slack_payload
+      run: |
+        FILE_PATH="${GITHUB_WORKSPACE}/slack_payload.json"
+        
+        echo "📂 Création du fichier JSON : $FILE_PATH"
+        
+        cat <<EOF > "$FILE_PATH"
+        {
+          "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch \`${{ github.ref_name }}\`: ${{ env.FINAL_BUILD_STATUS }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+          "attachments": [{
+            "pretext": "Build Status: ${{ env.FINAL_BUILD_STATUS }}",
+            "color": "${{ env.FINAL_BUILD_STATUS == 'success' && '28a745' || 'ff0000' }}",
+            "fields": [
+              {
+                "title": "PHPUnit",
+                "short": true,
+                "value": "${{ env.PHPUNIT_STATUS }}"
+              },
+              {
+                "title": "Jest",
+                "short": true,
+                "value": "${{ env.JEST_STATUS }}"
+              },
+              {
+                "title": "Behat",
+                "short": true,
+                "value": "${{ env.BEHAT_STATUS }}"
+              }
+            ]
+          }]
+        }
+        EOF
+        
+        echo "✅ Fichier JSON généré avec succès."
+      
+      shell: bash
+    
+    # 📌 Envoyer le message Slack final
     - name: Slack - Résultat final des tests
       uses: slackapi/slack-github-action@v1.25.0
       with:
         channel-id: ${{ inputs.slack_channel_id }}
         update-ts: ${{ env.SLACK_TS }}
-        payload: |
-          {
-            "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ steps.set_test_success_output.outputs.test_success }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
-            "attachments": [{
-              "pretext": "Build Status: ${{ env.FINAL_BUILD_STATUS }}",
-              "color": "${{ env.FINAL_BUILD_STATUS == 'success' && '28a745' || 'ff0000' }}",
-              "fields": [
-                ${{ env.SHOW_TEST_STATUS == 'true' && '
-                { "title": "PHPUnit", "value": "'${{ env.PHPUNIT_STATUS }}'", "short": true },
-                { "title": "Jest", "value": "'${{ env.JEST_STATUS }}'", "short": true },
-                { "title": "Behat", "value": "'${{ env.BEHAT_STATUS }}'", "short": true }' || '' }}
-              ]
-            }]
-          }
+        payload-file-path: "${{ github.workspace }}/slack_payload.json"
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
+    
     
     
     - name: Deploy to recette
