@@ -82,7 +82,7 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - id: slack_init
+    - id: slack
       uses: slackapi/slack-github-action@v1.25.0
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
@@ -105,11 +105,11 @@ runs:
               }
             ]
           }
-
+    
     - name: Store Slack message timestamp
-      run: echo "SLACK_TS=${{ steps.slack_init.outputs.ts }}" >> $GITHUB_ENV
+      run: echo "SLACK_TS=${{ steps.slack.outputs.ts }}" >> $GITHUB_ENV
       shell: bash
-  
+    
     - name: Get CPU cores count
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
       id: cpu_cores
@@ -120,7 +120,7 @@ runs:
           echo "::set-output name=cores::$(nproc)"
         fi
       shell: bash
-      
+    
     - name: Slack - Docker
       uses: slackapi/slack-github-action@v1.25.0
       with:
@@ -128,7 +128,7 @@ runs:
         update-ts: ${{ env.SLACK_TS }}
         payload: |
           {
-            "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build en cours sur la branche `${{ github.ref_name }}` 🚀",
+             "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
             "attachments": [{
               "pretext": "🐳 Docker en cours...",
               "color": "dbab09",
@@ -162,7 +162,7 @@ runs:
         GIT_ORGANIZATION="${{ inputs.git_organization }}" \
         SLACK_TOKEN="${{ inputs.slack_bot_token }}" \
         IS_CI="true" \
-        SLACK_NOTIFICATION_TS="${{ steps.slack_init.outputs.ts }}" \
+        SLACK_NOTIFICATION_TS="${{ steps.slack.outputs.ts }}" \
         docker compose -f docker-compose-ci.yml up -d
     
     # 📌 Mise à jour Slack - Début de l'installation
@@ -173,7 +173,7 @@ runs:
         update-ts: ${{ env.SLACK_TS }}
         payload: |
           {
-            "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build en cours sur la branche `${{ github.ref_name }}` 🚀",
+             "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
             "attachments": [{
               "pretext": "📦 Installation des dépendances...",
               "color": "dbab09",
@@ -187,14 +187,8 @@ runs:
     
     - name: Install dependencies
       shell: bash
-      run: docker exec -u www-data web bash install-dependencies.sh
-      
-    - name: Build test environment
-      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
-      shell: bash
       run: |
-        docker exec -e NB_WORKERS=${{ steps.cpu_cores.outputs.cores }} -u www-data web bash ci.sh
-    
+        docker exec -u www-data web bash install-dependencies.sh
     
     # 📌 Mise à jour Slack - Début des tests
     - name: Slack - Exécution des tests
@@ -205,7 +199,7 @@ runs:
         update-ts: ${{ env.SLACK_TS }}
         payload: |
           {
-            "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build en cours sur la branche `${{ github.ref_name }}` 🚀",
+             "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
             "attachments": [{
               "pretext": "🧪 Exécution des tests...",
               "color": "dbab09",
@@ -217,51 +211,65 @@ runs:
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
     
+    - name: Build test environment
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
+      shell: bash
+      run: |
+        docker exec -e NB_WORKERS=${{ steps.cpu_cores.outputs.cores }} -u www-data web bash ci.sh
+    
     - name: PHPUnit
-      if: inputs.phpunit == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+      id: phpunit
       uses: nick-fields/retry@v3
+      if: inputs.phpunit == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
       with:
         timeout_minutes: 15
         max_attempts: 2
         command: docker exec -u www-data web bash -c "SYMFONY_DEPRECATIONS_HELPER=weak ./vendor/bin/paratest -p ${{ steps.cpu_cores.outputs.cores }} --runner=WrapperRunner --stop-on-failure"
     
     - name: Jest
-      if: inputs.jest == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+      id: jest
       uses: nick-fields/retry@v3
+      if: inputs.jest == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
       with:
         timeout_minutes: 15
         max_attempts: 2
         command: docker exec -u www-data web bash -c "${{ inputs.jest_command }}"
     
     - name: Behat
-      if: inputs.behat == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+      id: behat
       uses: nick-fields/retry@v3
+      if: inputs.behat == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
       with:
         timeout_minutes: 15
         max_attempts: 2
         command: docker exec -u www-data web bash -c "./vendor/bin/behat -l ${{ steps.cpu_cores.outputs.cores }} --suite=default --stop-on-failure"
-        
-    # 📌 Capture du statut des tests
+    
     - name: Set test_success output
       id: set_test_success_output
       run: |
         branch_name=${GITHUB_REF#refs/heads/}
         if [[ "$branch_name" =~ ^release- ]]; then
-          echo "test_success=success" >> $GITHUB_ENV
+          # Si la branche commence par release- : succès immédiat
+          echo "::set-output name=test_success::success"
         else
+          # Sinon, vérifier les résultats des tests
           if [[ "${{ inputs.behat }}" == "false" || "${{ steps.behat.outcome }}" == "success" ]] &&
              [[ "${{ inputs.phpunit }}" == "false" || "${{ steps.phpunit.outcome }}" == "success" ]] &&
-             [[ "${{ inputs.jest }}" == "false" || "${{ steps.jest.outcome }}" == "success" ]]; then
-            echo "test_success=success" >> $GITHUB_ENV
+             [[ "${{ inputs.jest }}" == "false" || "${{ steps.jest.outcome }}" == "success" ]]
+          then
+            echo "::set-output name=test_success::success"
           else
-            echo "test_success=failure" >> $GITHUB_ENV
+            echo "::set-output name=test_success::failure"
           fi
         fi
       shell: bash
-    
-    # 📌 Mise à jour Slack - Build et transfert des assets
+      
+      # 📌 Mise à jour Slack - Build et transfert des assets
     - name: Slack - Transfert des assets
-      if: success() && inputs.transfer_assets == 'true' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release-'))
+      if: success() && inputs.transfer_assets == 'true' && (
+        (github.ref == 'refs/heads/master' && (inputs.deploy_to_prod == 'true' || inputs.deploy_to_demo == 'true')) ||
+        (startsWith(github.ref, 'refs/heads/release-') && inputs.deploy_to_recette == 'true')
+        )
       uses: slackapi/slack-github-action@v1.25.0
       with:
         channel-id: ${{ inputs.slack_channel_id }}
@@ -283,8 +291,9 @@ runs:
     - name: Build server assets
       if: success() && inputs.transfer_assets == 'true' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release-'))
       shell: bash
-      run: docker exec -u www-data web bash build-server-assets.sh
-      
+      run: |
+        docker exec -u www-data web bash build-server-assets.sh
+    
     - name: Copy public/dist from container to host
       if: success() && inputs.transfer_assets == 'true' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release-'))
       run: |
@@ -298,7 +307,7 @@ runs:
       uses: webfactory/ssh-agent@v0.9.0
       with:
         ssh-private-key: ${{ inputs.ssh_private_key }}
-    
+    #
     - name: Transfer artifact to the recette
       if: success() && startsWith(github.ref, 'refs/heads/release-') && inputs.ip_recette && inputs.transfer_assets == 'true' && inputs.deploy_to_recette == 'true'
       run: |
@@ -325,7 +334,34 @@ runs:
         rsync -avz --delete ./public-dist-${{ github.sha }} www-data@${{ inputs.ip_prod }}:/var/www/$REPO_NAME/tmp
         rsync -avz --delete ./public-bundles-${{ github.sha }} www-data@${{ inputs.ip_prod }}:/var/www/$REPO_NAME/tmp
       shell: bash
-      
+    
+    - uses: slackapi/slack-github-action@v1.25.0
+      if: ${{ always() }}
+      with:
+        # You can pass in multiple channels to post to by providing a comma-delimited list of channel IDs.
+        channel-id: ${{ inputs.slack_channel_id }}
+        # For posting a simple plain text message
+        update-ts: ${{ steps.slack.outputs.ts }}
+        payload: |
+          {
+            "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ steps.set_test_success_output.outputs.test_success }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "attachments": [
+              {
+                "pretext": "Build Status: ${{ steps.set_test_success_output.outputs.test_success }}",
+                "color": "${{ steps.set_test_success_output.outputs.test_success == 'success' && '28a745' || 'ff0000' }}",
+                "fields": [
+                  {
+                    "title": "Status",
+                    "short": true,
+                    "value": "${{ steps.set_test_success_output.outputs.test_success == 'success' && 'Completed' || 'Failure' }}"
+                  }
+                ]
+              }
+            ]
+          }
+      env:
+        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
+    
     - name: Deploy to recette
       uses: cartesiaeducation/deploy-action@v1
       if: startsWith(github.ref, 'refs/heads/release-') && inputs.deploy_to_recette == 'true'
@@ -364,7 +400,7 @@ runs:
         stage: 'prod'
         branch: 'master'
         git_ref: ${{ github.sha }}
-        
+    
     - name: Create Sentry release
       if: github.ref == 'refs/heads/master' && inputs.deploy_to_prod == 'true'
       uses: getsentry/action-release@v1
@@ -374,31 +410,3 @@ runs:
         SENTRY_PROJECT: ${{ inputs.sentry_project }}
       with:
         environment: prod
-    
-    # 📌 Slack - Mise à jour finale (succès ou échec)
-    - uses: slackapi/slack-github-action@v1.25.0
-      if: ${{ always() }}
-      with:
-        # You can pass in multiple channels to post to by providing a comma-delimited list of channel IDs.
-        channel-id: ${{ inputs.slack_channel_id }}
-        # For posting a simple plain text message
-        update-ts: ${{ steps.slack_init.outputs.ts }}
-        payload: |
-          {
-            "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ steps.set_test_success_output.outputs.test_success }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
-            "attachments": [
-              {
-                "pretext": "Build Status: ${{ steps.set_test_success_output.outputs.test_success }}",
-                "color": "${{ steps.set_test_success_output.outputs.test_success == 'success' && '28a745' || 'ff0000' }}",
-                "fields": [
-                  {
-                    "title": "Status",
-                    "short": true,
-                    "value": "${{ steps.set_test_success_output.outputs.test_success == 'success' && 'Completed' || 'Failure' }}"
-                  }
-                ]
-              }
-            ]
-          }
-      env:
-        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
