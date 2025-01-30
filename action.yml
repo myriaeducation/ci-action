@@ -132,7 +132,7 @@ runs:
             "attachments": [{
               "color": "dbab09",
               "fields": [
-                { "title": "Docker", "value": "⏳ En cours...", "short": true }
+                { "title": "📥 Téléchargement et montage des containers docker en cours...", "value": "⏳ En cours...", "short": true }
               ]
             }]
           }
@@ -371,7 +371,7 @@ runs:
                 }' >> "$FILE_PATH"
         fi
         
-        # Fermeture du JSON
+        # Fermeture du JSON proprement
         echo '
               ]
             }
@@ -383,10 +383,11 @@ runs:
           echo "Erreur : le fichier $FILE_PATH n'a pas été créé !" >&2
           exit 1
         fi
+      
       shell: bash
     
     - name: Debug - Check JSON File
-      run: cat ${GITHUB_WORKSPACE}/slack_payload.json
+      run: cat slack_payload.json
       shell: bash
     
     - name: Slack - Build Status
@@ -395,11 +396,9 @@ runs:
       with:
         channel-id: ${{ inputs.slack_channel_id }}
         update-ts: ${{ env.SLACK_TS }}
-        payload-file-path: ${GITHUB_WORKSPACE}/slack_payload.json
+        payload-file-path: slack_payload.json
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
-    
-    
     
     - name: Deploy to recette
       uses: cartesiaeducation/deploy-action@v1
