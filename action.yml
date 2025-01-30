@@ -213,7 +213,26 @@ runs:
       shell: bash
       run: |
         docker exec -e NB_WORKERS=${{ steps.cpu_cores.outputs.cores }} -u www-data web bash ci.sh
-    
+
+    - name: Slack - Exécution des tests phpunit
+      if: inputs.phpunit == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+      uses: slackapi/slack-github-action@v1.25.0
+      with:
+        channel-id: ${{ inputs.slack_channel_id }}
+        update-ts: ${{ env.SLACK_TS }}
+        payload: |
+          {
+             "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "attachments": [{
+              "color": "dbab09",
+              "fields": [
+                { "title": "🧪 PHPUnit...", "value": "⏳ En cours...", "short": true }
+              ]
+            }]
+          }
+      env:
+        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
+        
     - name: PHPUnit
       id: phpunit
       uses: nick-fields/retry@v3
@@ -223,6 +242,25 @@ runs:
         max_attempts: 2
         command: docker exec -u www-data web bash -c "SYMFONY_DEPRECATIONS_HELPER=weak ./vendor/bin/paratest -p ${{ steps.cpu_cores.outputs.cores }} --runner=WrapperRunner --stop-on-failure"
     
+    - name: Slack - Exécution des tests jest
+      if: inputs.jest == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+      uses: slackapi/slack-github-action@v1.25.0
+      with:
+        channel-id: ${{ inputs.slack_channel_id }}
+        update-ts: ${{ env.SLACK_TS }}
+        payload: |
+          {
+             "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "attachments": [{
+              "color": "dbab09",
+              "fields": [
+                { "title": "🧪 Jest...", "value": "⏳ En cours...", "short": true }
+              ]
+            }]
+          }
+      env:
+        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
+        
     - name: Jest
       id: jest
       uses: nick-fields/retry@v3
@@ -232,6 +270,25 @@ runs:
         max_attempts: 2
         command: docker exec -u www-data web bash -c "${{ inputs.jest_command }}"
     
+    - name: Slack - Exécution des tests behat
+      if: inputs.behat == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+      uses: slackapi/slack-github-action@v1.25.0
+      with:
+        channel-id: ${{ inputs.slack_channel_id }}
+        update-ts: ${{ env.SLACK_TS }}
+        payload: |
+          {
+             "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "attachments": [{
+              "color": "dbab09",
+              "fields": [
+                { "title": "🧪 Behat...", "value": "⏳ En cours...", "short": true }
+              ]
+            }]
+          }
+      env:
+        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
+        
     - name: Behat
       id: behat
       uses: nick-fields/retry@v3
@@ -384,10 +441,6 @@ runs:
           exit 1
         fi
       
-      shell: bash
-    
-    - name: Debug - Check JSON File
-      run: cat slack_payload.json
       shell: bash
     
     - name: Slack - Build Status
