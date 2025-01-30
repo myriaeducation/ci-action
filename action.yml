@@ -267,13 +267,14 @@ runs:
         max_attempts: 2
         command: docker exec -u www-data web bash -c "SYMFONY_DEPRECATIONS_HELPER=weak ./vendor/bin/paratest -p ${{ steps.cpu_cores.outputs.cores }} --runner=WrapperRunner --stop-on-failure"
     
-    - name: Définir le statut de PHPUnit
-      if: env.SHOW_TEST_STATUS == 'true' && inputs.phpunit == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+    - name: Mettre à jour le statut de PHPUnit
+      if: env.SHOW_TEST_STATUS == 'true' && inputs.phpunit == 'true'
       run: |
         if [[ "${{ steps.phpunit.outcome }}" == "success" ]]; then
           echo "PHPUNIT_STATUS=✅ Réussi" >> $GITHUB_ENV
         else
           echo "PHPUNIT_STATUS=❌ Échec" >> $GITHUB_ENV
+          echo "FINAL_BUILD_STATUS=failure" >> $GITHUB_ENV  # Marquer l'ensemble du build comme failed
         fi
       shell: bash
     
@@ -308,13 +309,14 @@ runs:
         max_attempts: 2
         command: docker exec -u www-data web bash -c "${{ inputs.jest_command }}"
     
-    - name: Définir le statut de Jest
+    - name: Mettre à jour le statut de Jest
       if: env.SHOW_TEST_STATUS == 'true' && inputs.jest == 'true' && steps.phpunit.outcome == 'success'
       run: |
         if [[ "${{ steps.jest.outcome }}" == "success" ]]; then
           echo "JEST_STATUS=✅ Réussi" >> $GITHUB_ENV
         else
           echo "JEST_STATUS=❌ Échec" >> $GITHUB_ENV
+          echo "FINAL_BUILD_STATUS=failure" >> $GITHUB_ENV
         fi
       shell: bash
       
@@ -348,13 +350,14 @@ runs:
         max_attempts: 2
         command: docker exec -u www-data web bash -c "./vendor/bin/behat -l ${{ steps.cpu_cores.outputs.cores }} --suite=default --stop-on-failure"
         
-    - name: Définir le statut de Behat
+    - name: Mettre à jour le statut de Behat
       if: env.SHOW_TEST_STATUS == 'true' && inputs.behat == 'true' && steps.jest.outcome == 'success'
       run: |
         if [[ "${{ steps.behat.outcome }}" == "success" ]]; then
           echo "BEHAT_STATUS=✅ Réussi" >> $GITHUB_ENV
         else
           echo "BEHAT_STATUS=❌ Échec" >> $GITHUB_ENV
+          echo "FINAL_BUILD_STATUS=failure" >> $GITHUB_ENV
         fi
       shell: bash
       
@@ -429,8 +432,6 @@ runs:
       shell: bash
     
     - name: Générer le message Slack final
-      if: always()
-      id: generate_slack_payload
       run: |
         FILE_PATH="${GITHUB_WORKSPACE}/slack_payload.json"
         
@@ -464,7 +465,6 @@ runs:
         EOF
         
         echo "✅ Fichier JSON généré avec succès."
-      
       shell: bash
     
     # 📌 Envoyer le message Slack final
