@@ -189,7 +189,7 @@ runs:
         docker exec -u www-data web bash install-dependencies.sh
     
     # 📌 Mise à jour Slack - Début des tests
-    - name: Slack - Exécution des tests
+    - name: Slack - Initialisation des tests
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
       uses: slackapi/slack-github-action@v1.25.0
       with:
@@ -201,7 +201,7 @@ runs:
             "attachments": [{
               "color": "dbab09",
               "fields": [
-                { "title": "🧪 Exécution des tests...", "value": "⏳ En cours...", "short": true }
+                { "title": "🧪 Initialisation des tests...", "value": "⏳ En cours...", "short": true }
               ]
             }]
           }
@@ -397,14 +397,14 @@ runs:
         TEST_SUCCESS: ${{ env.test_success }}
         TEST_COLOR: ${{ env.test_success == 'success' && '28a745' || 'ff0000' }}
         TEST_STATUS: ${{ env.test_success == 'success' && '✅ Completed' || '❌ Failure' }}
-        SHOW_TEST_STATUS: ${{ env.show_test_status }}
+        SHOW_TEST_STATUS: ${{ env.show_test_status || 'false' }}  # Défaut à false si non défini
         PHPUNIT_STATUS: ${{ inputs.phpunit == 'false' && '⚪ N/A' || (steps.phpunit.outcome == 'success' && '✅ Passed' || '❌ Failed') }}
         JEST_STATUS: ${{ inputs.jest == 'false' && '⚪ N/A' || (steps.jest.outcome == 'success' && '✅ Passed' || '❌ Failed') }}
         BEHAT_STATUS: ${{ inputs.behat == 'false' && '⚪ N/A' || (steps.behat.outcome == 'success' && '✅ Passed' || '❌ Failed') }}
       run: |
         set -e  # Stoppe immédiatement le script en cas d'erreur
         
-        FILE_PATH="${GITHUB_WORKSPACE}/slack_payload.json"
+        FILE_PATH="slack_payload.json"  # Pas besoin de ${GITHUB_WORKSPACE}
         
         echo "📂 Création du fichier JSON à : $FILE_PATH"
         
@@ -422,48 +422,55 @@ runs:
                   "short": true,
                   "value": "${TEST_STATUS}"
                 }
-          EOF
-          
-          # Ajout des statuts de tests uniquement si `SHOW_TEST_STATUS == true`
-          if [[ "$SHOW_TEST_STATUS" == "true" ]]; then
-            cat <<EOF >> "$FILE_PATH"
-            ,
-            {
-              "title": "PHPUnit",
-              "short": true,
-              "value": "${PHPUNIT_STATUS}"
-            },
-          {
-            "title": "Jest",
-            "short": true,
-            "value": "${JEST_STATUS}"
-          },
-          {
-            "title": "Behat",
-            "short": true,
-            "value": "${BEHAT_STATUS}"
-          }
-          EOF
-        fi
-        
-        # Fermeture propre du JSON
-        cat <<EOF >> "$FILE_PATH"
+                EOF
+                  
+                  # Ajout des statuts de tests uniquement si `SHOW_TEST_STATUS == true`
+                  if [ [ "$SHOW_TEST_STATUS" == "true" ] ]; then
+                  cat <<EOF >> "$FILE_PATH"
+                ,
+                {
+                  "title": "PHPUnit",
+                  "short": true,
+                  "value": "${PHPUNIT_STATUS}"
+                },
+                {
+                  "title": "Jest",
+                  "short": true,
+                  "value": "${JEST_STATUS}"
+                },
+                {
+                  "title": "Behat",
+                  "short": true,
+                  "value": "${BEHAT_STATUS}"
+                }
+                EOF
+                  fi
+                  
+                  # Fermeture propre du JSON
+                  cat <<EOF >> "$FILE_PATH"
               ]
-              }
-            ]
-          }
+            }
+          ]
+        }
         EOF
         
         # Vérification que le fichier a bien été créé
         if [[ ! -f "$FILE_PATH" ]]; then
-          echo "❌ Erreur: le fichier $FILE_PATH n'a pas été créé !" >&2
-          exit 1
+        echo "❌ Erreur: le fichier $FILE_PATH n'a pas été créé !" >&2
+        exit 1
         fi
         
         echo "✅ Fichier JSON généré avec succès: $FILE_PATH"
+        
+        # Délai pour éviter que Slack essaie de lire un fichier encore en écriture
+        sleep 2
     
     - name: Debug - Check JSON File
-      run: cat "${GITHUB_WORKSPACE}/slack_payload.json"
+      run: |
+        echo "📂 Vérification des fichiers présents dans le répertoire courant :"
+        ls -lah
+        echo "📂 Contenu de slack_payload.json :"
+        cat slack_payload.json
       shell: bash
     
     - name: Slack - Build Status
@@ -472,20 +479,10 @@ runs:
       with:
         channel-id: ${{ inputs.slack_channel_id }}
         update-ts: ${{ env.SLACK_TS }}
-        payload-file-path: "${GITHUB_WORKSPACE}/slack_payload.json"
+        payload-file-path: "slack_payload.json"  # Pas de ${GITHUB_WORKSPACE}, car Slack cherche le fichier dans le répertoire actuel
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
     
-    
-    - name: Slack - Build Status
-      uses: slackapi/slack-github-action@v1.25.0
-      if: ${{ always() }}
-      with:
-        channel-id: ${{ inputs.slack_channel_id }}
-        update-ts: ${{ env.SLACK_TS }}
-        payload-file-path: slack_payload.json
-      env:
-        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
     
     - name: Deploy to recette
       uses: cartesiaeducation/deploy-action@v1
