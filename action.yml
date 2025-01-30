@@ -249,17 +249,19 @@ runs:
       run: |
         branch_name=${GITHUB_REF#refs/heads/}
         if [[ "$branch_name" =~ ^release- ]]; then
-          # Si la branche commence par release- : succès immédiat
-          echo "::set-output name=test_success::success"
+          # Si la branche commence par release-, succès immédiat car pas de test
+          echo "test_success=success" >> $GITHUB_ENV
+          echo "show_test_status=false" >> $GITHUB_ENV
         else
           # Sinon, vérifier les résultats des tests
+          echo "show_test_status=true" >> $GITHUB_ENV
           if [[ "${{ inputs.behat }}" == "false" || "${{ steps.behat.outcome }}" == "success" ]] &&
              [[ "${{ inputs.phpunit }}" == "false" || "${{ steps.phpunit.outcome }}" == "success" ]] &&
              [[ "${{ inputs.jest }}" == "false" || "${{ steps.jest.outcome }}" == "success" ]]
           then
-            echo "::set-output name=test_success::success"
+            echo "test_success=success" >> $GITHUB_ENV
           else
-            echo "::set-output name=test_success::failure"
+            echo "test_success=failure" >> $GITHUB_ENV
           fi
         fi
       shell: bash
@@ -335,26 +337,43 @@ runs:
         rsync -avz --delete ./public-bundles-${{ github.sha }} www-data@${{ inputs.ip_prod }}:/var/www/$REPO_NAME/tmp
       shell: bash
     
-    - uses: slackapi/slack-github-action@v1.25.0
+    - name: Slack - Build Status
+      uses: slackapi/slack-github-action@v1.25.0
       if: ${{ always() }}
       with:
-        # You can pass in multiple channels to post to by providing a comma-delimited list of channel IDs.
         channel-id: ${{ inputs.slack_channel_id }}
-        # For posting a simple plain text message
-        update-ts: ${{ steps.slack.outputs.ts }}
+        update-ts: ${{ env.SLACK_TS }}
         payload: |
           {
-            "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ steps.set_test_success_output.outputs.test_success }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ env.test_success }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
             "attachments": [
               {
-                "pretext": "Build Status: ${{ steps.set_test_success_output.outputs.test_success }}",
-                "color": "${{ steps.set_test_success_output.outputs.test_success == 'success' && '28a745' || 'ff0000' }}",
+                "pretext": "Build Status: ${{ env.test_success }}",
+                "color": "${{ env.test_success == 'success' && '28a745' || 'ff0000' }}",
                 "fields": [
                   {
                     "title": "Status",
                     "short": true,
-                    "value": "${{ steps.set_test_success_output.outputs.test_success == 'success' && 'Completed' || 'Failure' }}"
+                    "value": "${{ env.test_success == 'success' && '✅ Completed' || '❌ Failure' }}"
                   }
+                  ${{ env.show_test_status == 'true' && ',' || '' }}
+                  ${{ env.show_test_status == 'true' && '{
+                    "title": "PHPUnit",
+                    "short": true,
+                    "value": "${{ inputs.phpunit == 'false' && '⚪ Non applicable' || (steps.phpunit.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"
+                  }' || '' }}
+                  ${{ env.show_test_status == 'true' && ',' || '' }}
+                  ${{ env.show_test_status == 'true' && '{
+                    "title": "Jest",
+                    "short": true,
+                    "value": "${{ inputs.jest == 'false' && '⚪ Non applicable' || (steps.jest.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"
+                  }' || '' }}
+                  ${{ env.show_test_status == 'true' && ',' || '' }}
+                  ${{ env.show_test_status == 'true' && '{
+                    "title": "Behat",
+                    "short": true,
+                    "value": "${{ inputs.behat == 'false' && '⚪ Non applicable' || (steps.behat.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"
+                  }' || '' }}
                 ]
               }
             ]
