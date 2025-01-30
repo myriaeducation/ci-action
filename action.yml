@@ -278,7 +278,7 @@ runs:
         update-ts: ${{ env.SLACK_TS }}
         payload: |
           {
-            "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build en cours sur la branche `${{ github.ref_name }}` 🚀",
+            "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
             "attachments": [{
               "pretext": "📂 Transfert des assets...",
               "color": "dbab09",
@@ -337,49 +337,68 @@ runs:
         rsync -avz --delete ./public-bundles-${{ github.sha }} www-data@${{ inputs.ip_prod }}:/var/www/$REPO_NAME/tmp
       shell: bash
     
+    - name: Set Slack Payload
+      id: slack_payload
+      run: |
+        JSON_PAYLOAD=$(cat <<EOF
+        {
+          "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ env.test_success }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+          "attachments": [
+            {
+              "pretext": "Build Status: ${{ env.test_success }}",
+              "color": "${{ env.test_success == 'success' && '28a745' || 'ff0000' }}",
+              "fields": [
+                {
+                  "title": "Status",
+                  "short": true,
+                  "value": "${{ env.test_success == 'success' && '✅ Completed' || '❌ Failure' }}"
+                }
+                EOF
+        )
+        
+        if [[ "${{ env.show_test_status }}" == "true" ]]; then
+          JSON_PAYLOAD+=$(cat <<EOF
+                ,
+                {
+                  "title": "PHPUnit",
+                  "short": true,
+                  "value": "${{ inputs.phpunit == 'false' && '⚪ Non applicable' || (steps.phpunit.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"
+                },
+                {
+                  "title": "Jest",
+                  "short": true,
+                  "value": "${{ inputs.jest == 'false' && '⚪ Non applicable' || (steps.jest.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"
+                },
+                {
+                  "title": "Behat",
+                  "short": true,
+                  "value": "${{ inputs.behat == 'false' && '⚪ Non applicable' || (steps.behat.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"
+                }
+          EOF
+          )
+        fi
+        
+        JSON_PAYLOAD+=$(cat <<EOF
+              ]
+            }
+          ]
+        }
+        EOF
+        )
+        
+        echo "$JSON_PAYLOAD" > slack_payload.json
+      shell: bash
+    
     - name: Slack - Build Status
       uses: slackapi/slack-github-action@v1.25.0
       if: ${{ always() }}
       with:
         channel-id: ${{ inputs.slack_channel_id }}
         update-ts: ${{ env.SLACK_TS }}
-        payload: |
-          {
-            "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ env.test_success }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
-            "attachments": [
-              {
-                "pretext": "Build Status: ${{ env.test_success }}",
-                "color": "${{ env.test_success == 'success' && '28a745' || 'ff0000' }}",
-                "fields": [
-                  {
-                    "title": "Status",
-                    "short": true,
-                    "value": "${{ env.test_success == 'success' && '✅ Completed' || '❌ Failure' }}"
-                  }
-                  {{#if env.show_test_status == 'true'}}
-                  ,
-                  {
-                    "title": "PHPUnit",
-                    "short": true,
-                    "value": "${{ inputs.phpunit == 'false' && '⚪ Non applicable' || (steps.phpunit.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"
-                  },
-                  {
-                    "title": "Jest",
-                    "short": true,
-                    "value": "${{ inputs.jest == 'false' && '⚪ Non applicable' || (steps.jest.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"
-                  },
-                  {
-                    "title": "Behat",
-                    "short": true,
-                    "value": "${{ inputs.behat == 'false' && '⚪ Non applicable' || (steps.behat.outcome == 'success' && '✅ Réussi' || '❌ Échec') }}"
-                  }
-                  {{/if}}
-                ]
-              }
-            ]
-          }
+        payload-file-path: ./slack_payload.json
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
+    
     
     - name: Deploy to recette
       uses: cartesiaeducation/deploy-action@v1
