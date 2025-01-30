@@ -188,9 +188,31 @@ runs:
       run: |
         docker exec -u www-data web bash install-dependencies.sh
     
-    # 📌 Mise à jour Slack - Début des tests
+    # 📌 Étape 0 - Vérifier si les tests doivent être affichés
+    - name: Vérifier si les tests doivent être affichés
+      run: |
+        branch_name=${GITHUB_REF#refs/heads/}
+        if [[ "$branch_name" =~ ^release- ]]; then
+          echo "SHOW_TEST_STATUS=false" >> $GITHUB_ENV
+          echo "FINAL_BUILD_STATUS=success" >> $GITHUB_ENV  # Aucun test exécuté → succès
+        else
+          echo "SHOW_TEST_STATUS=true" >> $GITHUB_ENV
+          echo "FINAL_BUILD_STATUS=success" >> $GITHUB_ENV  # On suppose un succès initial
+        fi
+      shell: bash
+    
+    # 📌 Initialiser les statuts des tests uniquement si SHOW_TEST_STATUS=true
+    - name: Initialiser les statuts des tests
+      if: env.SHOW_TEST_STATUS == 'true'
+      run: |
+        echo "PHPUNIT_STATUS=⚪ N/A" >> $GITHUB_ENV
+        echo "JEST_STATUS=⚪ N/A" >> $GITHUB_ENV
+        echo "BEHAT_STATUS=⚪ N/A" >> $GITHUB_ENV
+      shell: bash
+      
+      # 📌 Mise à jour Slack - Début des tests
     - name: Slack - Initialisation des tests
-      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
+      if: env.SHOW_TEST_STATUS == 'true' && github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
       uses: slackapi/slack-github-action@v1.25.0
       with:
         channel-id: ${{ inputs.slack_channel_id }}
@@ -213,54 +235,70 @@ runs:
       shell: bash
       run: |
         docker exec -e NB_WORKERS=${{ steps.cpu_cores.outputs.cores }} -u www-data web bash ci.sh
-
-    - name: Slack - Exécution des tests phpunit
-      if: inputs.phpunit == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+    
+    - name: Slack - Exécution des tests PHPUnit
+      if: env.SHOW_TEST_STATUS == 'true' && inputs.phpunit == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
       uses: slackapi/slack-github-action@v1.25.0
       with:
         channel-id: ${{ inputs.slack_channel_id }}
         update-ts: ${{ env.SLACK_TS }}
         payload: |
           {
-             "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "text": "📌 Tests en cours (`${{ github.ref_name }}`) 🚀",
             "attachments": [{
               "color": "dbab09",
               "fields": [
-                { "title": "🧪 PHPUnit...", "value": "⏳ En cours...", "short": true }
+                { "title": "PHPUnit", "value": "⏳ En cours...", "short": true },
+                { "title": "Jest", "value": "⚪ N/A", "short": true },
+                { "title": "Behat", "value": "⚪ N/A", "short": true }
               ]
             }]
           }
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
         
+        
     - name: PHPUnit
       id: phpunit
       uses: nick-fields/retry@v3
-      if: inputs.phpunit == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+      if: env.SHOW_TEST_STATUS == 'true' && inputs.phpunit == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
       with:
         timeout_minutes: 15
         max_attempts: 2
         command: docker exec -u www-data web bash -c "SYMFONY_DEPRECATIONS_HELPER=weak ./vendor/bin/paratest -p ${{ steps.cpu_cores.outputs.cores }} --runner=WrapperRunner --stop-on-failure"
     
-    - name: Slack - Exécution des tests jest
-      if: inputs.jest == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+    - name: Définir le statut de PHPUnit
+      if: env.SHOW_TEST_STATUS == 'true' && inputs.phpunit == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+      run: |
+        if [[ "${{ steps.phpunit.outcome }}" == "success" ]]; then
+          echo "PHPUNIT_STATUS=✅ Réussi" >> $GITHUB_ENV
+        else
+          echo "PHPUNIT_STATUS=❌ Échec" >> $GITHUB_ENV
+        fi
+      shell: bash
+    
+    
+    - name: Slack - Exécution des tests Jest
+      if: env.SHOW_TEST_STATUS == 'true' && inputs.jest == 'true' && steps.phpunit.outcome == 'success'
       uses: slackapi/slack-github-action@v1.25.0
       with:
         channel-id: ${{ inputs.slack_channel_id }}
         update-ts: ${{ env.SLACK_TS }}
         payload: |
           {
-             "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "text": "📌 Tests en cours (`${{ github.ref_name }}`) 🚀",
             "attachments": [{
               "color": "dbab09",
               "fields": [
-                { "title": "🧪 Jest...", "value": "⏳ En cours...", "short": true }
+                { "title": "PHPUnit", "value": "${{ env.PHPUNIT_STATUS }}", "short": true },
+                { "title": "Jest", "value": "⏳ En cours...", "short": true },
+                { "title": "Behat", "value": "⚪ N/A", "short": true }
               ]
             }]
           }
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
-        
+    
     - name: Jest
       id: jest
       uses: nick-fields/retry@v3
@@ -270,25 +308,37 @@ runs:
         max_attempts: 2
         command: docker exec -u www-data web bash -c "${{ inputs.jest_command }}"
     
-    - name: Slack - Exécution des tests behat
-      if: inputs.behat == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+    - name: Définir le statut de Jest
+      if: env.SHOW_TEST_STATUS == 'true' && inputs.jest == 'true' && steps.phpunit.outcome == 'success'
+      run: |
+        if [[ "${{ steps.jest.outcome }}" == "success" ]]; then
+          echo "JEST_STATUS=✅ Réussi" >> $GITHUB_ENV
+        else
+          echo "JEST_STATUS=❌ Échec" >> $GITHUB_ENV
+        fi
+      shell: bash
+      
+    - name: Slack - Exécution des tests Behat
+      if: env.SHOW_TEST_STATUS == 'true' && inputs.behat == 'true' && steps.jest.outcome == 'success'
       uses: slackapi/slack-github-action@v1.25.0
       with:
         channel-id: ${{ inputs.slack_channel_id }}
         update-ts: ${{ env.SLACK_TS }}
         payload: |
           {
-             "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "text": "📌 Tests en cours (`${{ github.ref_name }}`) 🚀",
             "attachments": [{
               "color": "dbab09",
               "fields": [
-                { "title": "🧪 Behat...", "value": "⏳ En cours...", "short": true }
+                { "title": "PHPUnit", "value": "${{ env.PHPUNIT_STATUS }}", "short": true },
+                { "title": "Jest", "value": "${{ env.JEST_STATUS }}", "short": true },
+                { "title": "Behat", "value": "⏳ En cours...", "short": true }
               ]
             }]
           }
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
-        
+    
     - name: Behat
       id: behat
       uses: nick-fields/retry@v3
@@ -297,26 +347,14 @@ runs:
         timeout_minutes: 15
         max_attempts: 2
         command: docker exec -u www-data web bash -c "./vendor/bin/behat -l ${{ steps.cpu_cores.outputs.cores }} --suite=default --stop-on-failure"
-    
-    - name: Set test_success output
-      id: set_test_success_output
+        
+    - name: Définir le statut de Behat
+      if: env.SHOW_TEST_STATUS == 'true' && inputs.behat == 'true' && steps.jest.outcome == 'success'
       run: |
-        branch_name=${GITHUB_REF#refs/heads/}
-        if [[ "$branch_name" =~ ^release- ]]; then
-          # Si la branche commence par release-, succès immédiat car pas de test
-          echo "test_success=success" >> $GITHUB_ENV
-          echo "show_test_status=false" >> $GITHUB_ENV
+        if [[ "${{ steps.behat.outcome }}" == "success" ]]; then
+          echo "BEHAT_STATUS=✅ Réussi" >> $GITHUB_ENV
         else
-          # Sinon, vérifier les résultats des tests
-          echo "show_test_status=true" >> $GITHUB_ENV
-          if [[ "${{ inputs.behat }}" == "false" || "${{ steps.behat.outcome }}" == "success" ]] &&
-             [[ "${{ inputs.phpunit }}" == "false" || "${{ steps.phpunit.outcome }}" == "success" ]] &&
-             [[ "${{ inputs.jest }}" == "false" || "${{ steps.jest.outcome }}" == "success" ]]
-          then
-            echo "test_success=success" >> $GITHUB_ENV
-          else
-            echo "test_success=failure" >> $GITHUB_ENV
-          fi
+          echo "BEHAT_STATUS=❌ Échec" >> $GITHUB_ENV
         fi
       shell: bash
       
@@ -390,96 +428,25 @@ runs:
         rsync -avz --delete ./public-bundles-${{ github.sha }} www-data@${{ inputs.ip_prod }}:/var/www/$REPO_NAME/tmp
       shell: bash
     
-    - name: Set Slack Payload
-      id: slack_payload
-      shell: bash
-      env:
-        TEST_SUCCESS: ${{ env.test_success }}
-        TEST_COLOR: ${{ env.test_success == 'success' && '28a745' || 'ff0000' }}
-        TEST_STATUS: ${{ env.test_success == 'success' && '✅ Completed' || '❌ Failure' }}
-        SHOW_TEST_STATUS: ${{ env.show_test_status || 'false' }}  # Défaut à false si non défini
-        PHPUNIT_STATUS: ${{ inputs.phpunit == 'false' && '⚪ N/A' || (steps.phpunit.outcome == 'success' && '✅ Passed' || '❌ Failed') }}
-        JEST_STATUS: ${{ inputs.jest == 'false' && '⚪ N/A' || (steps.jest.outcome == 'success' && '✅ Passed' || '❌ Failed') }}
-        BEHAT_STATUS: ${{ inputs.behat == 'false' && '⚪ N/A' || (steps.behat.outcome == 'success' && '✅ Passed' || '❌ Failed') }}
-      run: |
-        set -e  # Stoppe immédiatement le script en cas d'erreur
-        
-        FILE_PATH="slack_payload.json"  # Pas besoin de ${GITHUB_WORKSPACE}
-        
-        echo "📂 Création du fichier JSON à : $FILE_PATH"
-        
-        # Création du JSON proprement
-        cat <<EOF > "$FILE_PATH"
-        {
-          "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch \`${{ github.ref_name }}\`: ${TEST_SUCCESS} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
-          "attachments": [
-            {
-              "pretext": "Build Status: ${TEST_SUCCESS}",
-              "color": "${TEST_COLOR}",
-              "fields": [
-                {
-                  "title": "Status",
-                  "short": true,
-                  "value": "${TEST_STATUS}"
-                }
-                EOF
-                  
-                  # Ajout des statuts de tests uniquement si `SHOW_TEST_STATUS == true`
-                  if [ [ "$SHOW_TEST_STATUS" == "true" ] ]; then
-                  cat <<EOF >> "$FILE_PATH"
-                ,
-                {
-                  "title": "PHPUnit",
-                  "short": true,
-                  "value": "${PHPUNIT_STATUS}"
-                },
-                {
-                  "title": "Jest",
-                  "short": true,
-                  "value": "${JEST_STATUS}"
-                },
-                {
-                  "title": "Behat",
-                  "short": true,
-                  "value": "${BEHAT_STATUS}"
-                }
-                EOF
-                  fi
-                  
-                  # Fermeture propre du JSON
-                  cat <<EOF >> "$FILE_PATH"
-              ]
-            }
-          ]
-        }
-        EOF
-        
-        # Vérification que le fichier a bien été créé
-        if [[ ! -f "$FILE_PATH" ]]; then
-        echo "❌ Erreur: le fichier $FILE_PATH n'a pas été créé !" >&2
-        exit 1
-        fi
-        
-        echo "✅ Fichier JSON généré avec succès: $FILE_PATH"
-        
-        # Délai pour éviter que Slack essaie de lire un fichier encore en écriture
-        sleep 2
-    
-    - name: Debug - Check JSON File
-      run: |
-        echo "📂 Vérification des fichiers présents dans le répertoire courant :"
-        ls -lah
-        echo "📂 Contenu de slack_payload.json :"
-        cat slack_payload.json
-      shell: bash
-    
-    - name: Slack - Build Status
+    - name: Slack - Résultat final des tests
       uses: slackapi/slack-github-action@v1.25.0
-      if: ${{ always() }}
       with:
         channel-id: ${{ inputs.slack_channel_id }}
         update-ts: ${{ env.SLACK_TS }}
-        payload-file-path: "slack_payload.json"  # Pas de ${GITHUB_WORKSPACE}, car Slack cherche le fichier dans le répertoire actuel
+        payload: |
+          {
+            "text": "Repository: <https://github.com/${{ github.repository }}|${{ github.repository }}> - Build Status in branch `${{ github.ref_name }}`: ${{ steps.set_test_success_output.outputs.test_success }} - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "attachments": [{
+              "pretext": "Build Status: ${{ env.FINAL_BUILD_STATUS }}",
+              "color": "${{ env.FINAL_BUILD_STATUS == 'success' && '28a745' || 'ff0000' }}",
+              "fields": [
+                ${{ env.SHOW_TEST_STATUS == 'true' && '
+                { "title": "PHPUnit", "value": "'${{ env.PHPUNIT_STATUS }}'", "short": true },
+                { "title": "Jest", "value": "'${{ env.JEST_STATUS }}'", "short": true },
+                { "title": "Behat", "value": "'${{ env.BEHAT_STATUS }}'", "short": true }' || '' }}
+              ]
+            }]
+          }
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
     
