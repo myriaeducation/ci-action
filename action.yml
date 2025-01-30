@@ -1,3 +1,84 @@
+name: 'Deploy Action'
+description: 'A reusable GitHub Action for executing tests.'
+inputs:
+  slack_bot_token:
+    description: 'Slack bot token'
+    required: true
+  slack_channel_id:
+    description: 'Slack notification channel ID'
+    required: true
+  ssh_private_key:
+    description: 'SSH private key'
+    required: true
+  git_organization:
+    description: 'Git organization'
+    required: true
+  git_token:
+    description: 'Git token'
+    required: true
+  admin_domain:
+    description: 'Organization admin domain'
+    required: true
+  corporate_domain:
+    description: 'Organization corporate domain'
+    required: true
+  phpunit:
+    description: 'Execute phpunit tests'
+    required: false
+    default: 'false'
+  behat:
+    description: 'Execute behat tests'
+    required: false
+    default: 'false'
+  jest:
+    description: 'Execute jest tests'
+    required: false
+    default: 'false'
+  nb_workers:
+    description: 'Number of workers'
+    required: false
+  custom_env:
+    description: 'Custom environment variables as key=value pairs'
+    required: false
+  jest_command:
+    description: 'Custom Jest command'
+    required: false
+    default: 'npm run test --runInBand --silent'
+  ip_recette:
+    description: 'IP address for the recette environment'
+    required: false
+  ip_demo:
+    description: 'IP address for the demo environment'
+    required: false
+  ip_prod:
+    description: 'IP address for the prod environment'
+    required: false
+  transfer_assets:
+    description: 'Transfer server assets'
+    required: false
+    default: 'true'
+  deploy_to_recette:
+    description: 'Deploy to recette'
+    required: false
+    default: 'false'
+  deploy_to_demo:
+    description: 'Deploy to demo'
+    required: false
+    default: 'false'
+  deploy_to_prod:
+    description: 'Deploy to prod'
+    required: false
+    default: 'false'
+  sentry_auth_token:
+    description: 'Sentry auth token'
+    required: true
+  sentry_org:
+    description: 'Sentry organization slug'
+    required: true
+  sentry_project:
+    description: 'Sentry project token'
+    required: true
+
 runs:
   using: 'composite'
   steps:
