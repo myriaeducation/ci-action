@@ -126,6 +126,7 @@ runs:
         update-ts: ${{ env.SLACK_TS }}
         payload: |
           {
+            "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build en cours sur la branche `${{ github.ref_name }}` 🚀",
             "attachments": [{
               "pretext": "🐳 Docker en cours...",
               "color": "dbab09",
@@ -170,6 +171,7 @@ runs:
         update-ts: ${{ env.SLACK_TS }}
         payload: |
           {
+            "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build en cours sur la branche `${{ github.ref_name }}` 🚀",
             "attachments": [{
               "pretext": "📦 Installation des dépendances...",
               "color": "dbab09",
@@ -201,6 +203,7 @@ runs:
         update-ts: ${{ env.SLACK_TS }}
         payload: |
           {
+            "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build en cours sur la branche `${{ github.ref_name }}` 🚀",
             "attachments": [{
               "pretext": "🧪 Exécution des tests...",
               "color": "dbab09",
@@ -263,6 +266,7 @@ runs:
         update-ts: ${{ env.SLACK_TS }}
         payload: |
           {
+            "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build en cours sur la branche `${{ github.ref_name }}` 🚀",
             "attachments": [{
               "pretext": "📂 Transfert des assets...",
               "color": "dbab09",
@@ -319,70 +323,45 @@ runs:
         rsync -avz --delete ./public-dist-${{ github.sha }} www-data@${{ inputs.ip_prod }}:/var/www/$REPO_NAME/tmp
         rsync -avz --delete ./public-bundles-${{ github.sha }} www-data@${{ inputs.ip_prod }}:/var/www/$REPO_NAME/tmp
       shell: bash
-    
-    # 📌 Mise à jour Slack - Déploiement en cours
-    - name: Slack - Déploiement en cours
-      if: startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/master'
-      uses: slackapi/slack-github-action@v1.25.0
-      with:
-        channel-id: ${{ inputs.slack_channel_id }}
-        update-ts: ${{ env.SLACK_TS }}
-        payload: |
-          {
-            "attachments": [{
-              "pretext": "🚀 Déploiement en cours...",
-              "color": "dbab09",
-              "fields": [
-                { "title": "Déploiement", "value": "⏳ En cours...", "short": true }
-              ]
-            }]
-          }
-      env:
-        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
-    
-    - uses: ruby/setup-ruby@v1
-      if: startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/master'
-      with:
-        ruby-version: '3.3'
-        bundler-cache: true
-    
+      
     - name: Deploy to recette
-      id: deploy_recette
+      uses: cartesiaeducation/deploy-action@v1
       if: startsWith(github.ref, 'refs/heads/release-') && inputs.deploy_to_recette == 'true'
-      run: BRANCH=${{ github.ref_name }} IP=${{ inputs.ip_recette }} bundle exec cap recette deploy
-      shell: bash
+      with:
+        slack_bot_token: ${{ inputs.slack_bot_token }}
+        slack_channel_id: ${{ inputs.slack_channel_id }}
+        ssh_private_key: ${{ inputs.ssh_private_key }}
+        git_organization: ${{ inputs.git_organization }}
+        ip: ${{ inputs.ip_recette }}
+        stage: 'recette'
+        branch: ${{ github.ref_name }}
+        git_ref: ${{ github.sha }}
     
     - name: Deploy to demo
-      id: deploy_demo
+      uses: cartesiaeducation/deploy-action@v1
       if: github.ref == 'refs/heads/master' && inputs.deploy_to_demo == 'true'
-      run: BRANCH=${{ github.ref_name }} IP=${{ inputs.ip_demo }} bundle exec cap staging deploy
-      shell: bash
+      with:
+        slack_bot_token: ${{ inputs.slack_bot_token }}
+        slack_channel_id: ${{ inputs.slack_channel_id }}
+        ssh_private_key: ${{ inputs.ssh_private_key }}
+        git_organization: ${{ inputs.git_organization }}
+        ip: ${{ inputs.ip_demo }}
+        stage: 'staging'
+        branch: 'master'
+        git_ref: ${{ github.sha }}
     
     - name: Deploy to prod
-      id: deploy_prod
+      uses: cartesiaeducation/deploy-action@v1
       if: github.ref == 'refs/heads/master' && inputs.deploy_to_prod == 'true'
-      run: BRANCH=${{ github.ref_name }} IP=${{ inputs.ip_prod }} bundle exec cap prod deploy
-      shell: bash
-    
-    - name: Set deploy_success output
-      id: deploy_success
-      shell: bash
-      run: |
-        if [[ "${{ github.ref }}" == refs/heads/release-* || "${{ github.ref }}" == refs/heads/master ]]; then
-          DEPLOYMENT_SUCCESS=true
-          if [[ "${{ inputs.deploy_to_recette }}" == 'true' && "${{ steps.deploy_recette.outcome }}" != 'success' ]]; then
-            DEPLOYMENT_SUCCESS=false
-          fi
-          if [[ "${{ inputs.deploy_to_demo }}" == 'true' && "${{ steps.deploy_demo.outcome }}" != 'success' ]]; then
-            DEPLOYMENT_SUCCESS=false
-          fi
-          if [[ "${{ inputs.deploy_to_prod }}" == 'true' && "${{ steps.deploy_prod.outcome }}" != 'success' ]]; then
-            DEPLOYMENT_SUCCESS=false
-          fi
-          echo "deploy_success=$DEPLOYMENT_SUCCESS" >> $GITHUB_ENV
-        else
-          echo "deploy_success=true" >> $GITHUB_ENV
-        fi
+      with:
+        slack_bot_token: ${{ inputs.slack_bot_token }}
+        slack_channel_id: ${{ inputs.slack_channel_id }}
+        ssh_private_key: ${{ inputs.ssh_private_key }}
+        git_organization: ${{ inputs.git_organization }}
+        ip: ${{ inputs.ip_prod }}
+        stage: 'prod'
+        branch: 'master'
+        git_ref: ${{ github.sha }}
         
     - name: Create Sentry release
       if: github.ref == 'refs/heads/master' && inputs.deploy_to_prod == 'true'
