@@ -406,7 +406,7 @@ runs:
         
         FILE_PATH="${GITHUB_WORKSPACE}/slack_payload.json"
         
-        echo "Création du fichier JSON à : $FILE_PATH"
+        echo "📂 Création du fichier JSON à : $FILE_PATH"
         
         # Création du JSON proprement
         cat <<EOF > "$FILE_PATH"
@@ -422,37 +422,60 @@ runs:
                   "short": true,
                   "value": "${TEST_STATUS}"
                 }
-                EOF
-                  
-                  # Vérifier la valeur de `show_test_status`
-                  if [ [ "$SHOW_TEST_STATUS" == "true" ] ]; then
-                  cat <<EOF >> "$FILE_PATH"
-                ,
-                {
-                  "title": "PHPUnit",
-                  "short": true,
-                  "value": "${PHPUNIT_STATUS}"
-                },
-                {
-                  "title": "Jest",
-                  "short": true,
-                  "value": "${JEST_STATUS}"
-                },
-                {
-                  "title": "Behat",
-                  "short": true,
-                  "value": "${BEHAT_STATUS}"
-                }
-                EOF
-                  fi
-                  
-                  # Fermeture propre du JSON
-                  cat <<EOF >> "$FILE_PATH"
-              ]
-            }
-          ]
+          EOF
+          
+          # Ajout des statuts de tests uniquement si `SHOW_TEST_STATUS == true`
+          if [[ "$SHOW_TEST_STATUS" == "true" ]]; then
+          cat <<EOF >> "$FILE_PATH"
+          ,
+          {
+            "title": "PHPUnit",
+            "short": true,
+            "value": "${PHPUNIT_STATUS}"
+          },
+        {
+          "title": "Jest",
+          "short": true,
+          "value": "${JEST_STATUS}"
+        },
+        {
+          "title": "Behat",
+          "short": true,
+          "value": "${BEHAT_STATUS}"
         }
         EOF
+        fi
+        
+        # Fermeture propre du JSON
+        cat <<EOF >> "$FILE_PATH"
+      ]
+      }
+      ]
+      }
+        EOF
+        
+        # Vérification que le fichier a bien été créé
+        if [[ ! -f "$FILE_PATH" ]]; then
+        echo "❌ Erreur: le fichier $FILE_PATH n'a pas été créé !" >&2
+        exit 1
+        fi
+        
+        echo "✅ Fichier JSON généré avec succès: $FILE_PATH"
+    
+    - name: Debug - Check JSON File
+      run: cat "${GITHUB_WORKSPACE}/slack_payload.json"
+      shell: bash
+    
+    - name: Slack - Build Status
+      uses: slackapi/slack-github-action@v1.25.0
+      if: ${{ always() }}
+      with:
+        channel-id: ${{ inputs.slack_channel_id }}
+        update-ts: ${{ env.SLACK_TS }}
+        payload-file-path: "${GITHUB_WORKSPACE}/slack_payload.json"
+      env:
+        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
+    
     
     - name: Slack - Build Status
       uses: slackapi/slack-github-action@v1.25.0
