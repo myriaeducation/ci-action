@@ -213,7 +213,7 @@ runs:
       
       # 📌 Mise à jour Slack - Début des tests
     - name: Slack - Initialisation des tests
-      if: env.SHOW_TEST_STATUS == 'true' && github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
+      if: env.SHOW_TEST_STATUS == 'true'
       uses: slackapi/slack-github-action@v1.25.0
       with:
         channel-id: ${{ inputs.slack_channel_id }}
@@ -238,7 +238,7 @@ runs:
         docker exec -e NB_WORKERS=${{ steps.cpu_cores.outputs.cores }} -u www-data web bash ci.sh
     
     - name: Slack - Exécution des tests PHPUnit
-      if: env.SHOW_TEST_STATUS == 'true' && inputs.phpunit == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+      if: env.SHOW_TEST_STATUS == 'true' && inputs.phpunit == 'true'
       uses: slackapi/slack-github-action@v1.25.0
       with:
         channel-id: ${{ inputs.slack_channel_id }}
@@ -262,7 +262,7 @@ runs:
     - name: PHPUnit
       id: phpunit
       uses: nick-fields/retry@v3
-      if: env.SHOW_TEST_STATUS == 'true' && inputs.phpunit == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+      if: env.SHOW_TEST_STATUS == 'true' && inputs.phpunit == 'true'
       with:
         timeout_minutes: 15
         max_attempts: 2
@@ -276,13 +276,34 @@ runs:
           echo "PHPUNIT_STATUS=✅ Réussi" >> $GITHUB_ENV
         else
           echo "PHPUNIT_STATUS=❌ Échec" >> $GITHUB_ENV
-          echo "FINAL_BUILD_STATUS=failure" >> $GITHUB_ENV  # Marquer l'ensemble du build comme failed
+          echo "FINAL_BUILD_STATUS=failure" >> $GITHUB_ENV
         fi
+        
       shell: bash
-    
+      
+    - name: Slack - Mise à jour du statut Phpunit
+      if: env.SHOW_TEST_STATUS == 'true' && inputs.phpunit == 'true'
+      uses: slackapi/slack-github-action@v1.25.0
+      with:
+        channel-id: ${{ inputs.slack_channel_id }}
+        update-ts: ${{ env.SLACK_TS }}
+        payload: |
+          {
+            "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "attachments": [{
+              "color": "dbab09",
+              "fields": [
+                { "title": "PHPUnit", "value": "${{ env.PHPUNIT_STATUS }}", "short": true },
+                { "title": "Jest", "value": "⚪ N/A", "short": true },
+                { "title": "Behat", "value": "⚪ N/A", "short": true }
+              ]
+            }]
+          }
+      env:
+        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
     
     - name: Slack - Exécution des tests Jest
-      if: env.SHOW_TEST_STATUS == 'true' && inputs.jest == 'true' && steps.phpunit.outcome == 'success'
+      if: env.SHOW_TEST_STATUS == 'true' && inputs.jest == 'true'
       uses: slackapi/slack-github-action@v1.25.0
       with:
         channel-id: ${{ inputs.slack_channel_id }}
@@ -305,14 +326,14 @@ runs:
     - name: Jest
       id: jest
       uses: nick-fields/retry@v3
-      if: inputs.jest == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+      if: env.SHOW_TEST_STATUS == 'true' && inputs.jest == 'true'
       with:
         timeout_minutes: 15
         max_attempts: 2
         command: docker exec -u www-data web bash -c "${{ inputs.jest_command }}"
     
     - name: Mettre à jour le statut de Jest
-      if: always() && env.SHOW_TEST_STATUS == 'true' && inputs.jest == 'true' && steps.phpunit.outcome == 'success'
+      if: always() && env.SHOW_TEST_STATUS == 'true' && inputs.jest == 'true'
       run: |
         if [[ "${{ steps.jest.outcome }}" == "success" ]]; then
           echo "JEST_STATUS=✅ Réussi" >> $GITHUB_ENV
@@ -322,8 +343,29 @@ runs:
         fi
       shell: bash
       
+    - name: Slack - Mise à jour du statut Jest
+      if: env.SHOW_TEST_STATUS == 'true' && inputs.jest == 'true'
+      uses: slackapi/slack-github-action@v1.25.0
+      with:
+        channel-id: ${{ inputs.slack_channel_id }}
+        update-ts: ${{ env.SLACK_TS }}
+        payload: |
+          {
+            "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> : Build started in branch `${{ github.ref_name }}` (In Progress) - Build Link: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click here for build details>",
+            "attachments": [{
+              "color": "dbab09",
+              "fields": [
+                { "title": "PHPUnit", "value": "${{ env.PHPUNIT_STATUS }}", "short": true },
+                { "title": "Jest", "value": "${{ env.JEST_STATUS }}", "short": true },
+                { "title": "Behat", "value": "⚪ N/A", "short": true }
+              ]
+            }]
+          }
+      env:
+        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
+        
     - name: Slack - Exécution des tests Behat
-      if: env.SHOW_TEST_STATUS == 'true' && inputs.behat == 'true' && steps.jest.outcome == 'success'
+      if: env.SHOW_TEST_STATUS == 'true' && inputs.behat == 'true'
       uses: slackapi/slack-github-action@v1.25.0
       with:
         channel-id: ${{ inputs.slack_channel_id }}
@@ -353,7 +395,7 @@ runs:
         command: docker exec -u www-data web bash -c "./vendor/bin/behat -l ${{ steps.cpu_cores.outputs.cores }} --suite=default --stop-on-failure"
         
     - name: Mettre à jour le statut de Behat
-      if: always() && env.SHOW_TEST_STATUS == 'true' && inputs.behat == 'true' && steps.jest.outcome == 'success'
+      if: always() && env.SHOW_TEST_STATUS == 'true' && inputs.behat == 'true'
       run: |
         if [[ "${{ steps.behat.outcome }}" == "success" ]]; then
           echo "BEHAT_STATUS=✅ Réussi" >> $GITHUB_ENV
