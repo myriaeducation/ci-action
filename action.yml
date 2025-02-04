@@ -132,7 +132,7 @@ runs:
             "attachments": [{
               "color": "dbab09",
               "fields": [
-                { "title": "📥 Téléchargement et montage des containers docker en cours...", "value": "⏳ En cours...", "short": true }
+                { "title": "📥 Téléchargement et montage des containers docker...", "value": "⏳ En cours...", "short": true }
               ]
             }]
           }
