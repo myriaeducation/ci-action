@@ -524,7 +524,7 @@ runs:
         SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
     
     - name: Deploy to recette
-      uses: cartesiaeducation/deploy-action@v1
+      uses: myriaeducation/deploy-action@v1
       if: startsWith(github.ref, 'refs/heads/release-') && inputs.deploy_to_recette == 'true'
       with:
         slack_bot_token: ${{ inputs.slack_bot_token }}
@@ -537,7 +537,7 @@ runs:
         git_ref: ${{ github.sha }}
     
     - name: Deploy to demo
-      uses: cartesiaeducation/deploy-action@v1
+      uses: myriaeducation/deploy-action@v1
       if: github.ref == 'refs/heads/master' && inputs.deploy_to_demo == 'true'
       with:
         slack_bot_token: ${{ inputs.slack_bot_token }}
@@ -550,7 +550,7 @@ runs:
         git_ref: ${{ github.sha }}
     
     - name: Deploy to prod
-      uses: cartesiaeducation/deploy-action@v1
+      uses: myriaeducation/deploy-action@v1
       if: github.ref == 'refs/heads/master' && inputs.deploy_to_prod == 'true'
       with:
         slack_bot_token: ${{ inputs.slack_bot_token }}
